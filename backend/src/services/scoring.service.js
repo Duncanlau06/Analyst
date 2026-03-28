@@ -24,6 +24,30 @@ function sentimentToScore(value) {
   return Math.round(normalizeSentiment(value) * 100);
 }
 
+function normalizeFrontendScore(value, fallback = 50) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+
+  if (numericValue >= 0 && numericValue <= 1) {
+    return Math.round(numericValue * 100);
+  }
+
+  return Math.round(clamp(numericValue, 0, 100));
+}
+
+function normalizeFrontendWinner(value, companyA, companyB) {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'left' || normalized === companyA.id.toLowerCase()) {
+    return 'left';
+  }
+  if (normalized === 'right' || normalized === companyB.id.toLowerCase()) {
+    return 'right';
+  }
+  return 'tie';
+}
+
 function computeMentionScore(text, companyName) {
   const normalizedText = text.toLowerCase();
   const normalizedCompany = companyName.toLowerCase();
@@ -97,7 +121,26 @@ export function buildNoEvidenceComparisonResult({ companyA, companyB, waitMs }) 
 
 export function formatComparisonResultForFrontend({ companyA, companyB, rawResult }) {
   if (rawResult?.left && rawResult?.right) {
-    return rawResult;
+    const leftInput = rawResult.left || {};
+    const rightInput = rawResult.right || {};
+
+    return {
+      left: {
+        id: String(leftInput.id || companyA.id),
+        name: String(leftInput.name || companyA.name),
+        score: normalizeFrontendScore(leftInput.score, 50),
+        reason: leftInput.reason || `Evidence currently gives ${companyA.name} a balanced fit score.`,
+      },
+      right: {
+        id: String(rightInput.id || companyB.id),
+        name: String(rightInput.name || companyB.name),
+        score: normalizeFrontendScore(rightInput.score, 50),
+        reason: rightInput.reason || `Evidence currently gives ${companyB.name} a balanced fit score.`,
+      },
+      winner: normalizeFrontendWinner(rawResult.winner, companyA, companyB),
+      comparison_summary: rawResult.comparison_summary || `Comparison generated for ${companyA.name} versus ${companyB.name}.`,
+      confidence: normalizeConfidence(rawResult.confidence, 0.5),
+    };
   }
 
   const leftRaw = rawResult?.[companyA.id] || {};

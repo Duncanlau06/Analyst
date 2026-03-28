@@ -4,7 +4,7 @@ import { buildCommentItems, normalizeTinyfishResult } from './normalization.serv
 import { analyzeComparisonSentiment, analyzeComparisonWithoutEvidence } from './sentiment.service.js';
 import { buildNoEvidenceComparisonResult, formatComparisonResultForFrontend } from './scoring.service.js';
 import { fetchSocialComments } from './comments/social-comments.service.js';
-import { getTinyfishRunsBatch, startTinyfishAutomation } from './tinyfish.service.js';
+import { getTinyfishRunsBatch, startTinyfishAutomation, cancelTinyfishRunsBatch } from './tinyfish.service.js';
 import { comparisonStore } from './comparison-store.service.js';
 import { cache } from './cache.service.js';
 import { logger } from '../utils/logger.js';
@@ -125,19 +125,33 @@ async function startTaskRun({ task, comparisonId, onProgress }) {
 }
 
 async function runSelectedSources({ query, companyA, companyB, comparisonId, includeComments, sources, onProgress }) {
+  const selectedSocialSources = sources.includes('social')
+    ? getRankedSourcesByType(['social'], env.analysisMaxSocialSources)
+    : [];
   const selectedStandardSources = getRankedSourcesByType(
     sources.filter((type) => type !== 'social'),
     env.analysisMaxSources,
   );
-  const selectedSocialSources = sources.includes('social')
-    ? getRankedSourcesByType(['social'], env.analysisMaxSocialSources)
-    : [];
 
   const tasks = [
-    ...selectedStandardSources.map((source) => createSourceTask(source, query, companyA, companyB)),
+    // Prioritize social media sources - scrape these first
     ...(includeComments ? selectedSocialSources.map((source) => createSourceTask(source, query, companyA, companyB)) : []),
+    ...selectedStandardSources.map((source) => createSourceTask(source, query, companyA, companyB)),
   ];
-  const runStates = await Promise.all(tasks.map((task) => startTaskRun({ task, comparisonId, onProgress })));
+
+  // Start tasks in batches to avoid overwhelming TinyFish queue
+  const runStates = [];
+  const batchSize = 2;
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map((task) => startTaskRun({ task, comparisonId, onProgress })));
+    runStates.push(...batchResults);
+    // Small delay between batches to give TinyFish time to allocate workers
+    if (i + batchSize < tasks.length) {
+      await sleep(500);
+    }
+  }
+
   const deadlineAt = Date.now() + env.analysisPollBudgetMs;
 
   while (Date.now() < deadlineAt) {
@@ -195,6 +209,28 @@ async function runSelectedSources({ query, companyA, companyB, comparisonId, inc
           error: run.error || `TinyFish run ${status}`,
         });
       }
+    }
+  }
+
+  // Cancel any remaining pending/running tasks
+  const stillPendingStates = runStates.filter((state) => state.status === 'queued');
+  if (stillPendingStates.length > 0) {
+    const pendingRunIds = stillPendingStates.map((state) => state.runId);
+    onProgress(`Cancelling ${stillPendingStates.length} incomplete scraping tasks...`);
+    logger.info('Cancelling pending TinyFish runs', { comparisonId, runCount: pendingRunIds.length });
+    await cancelTinyfishRunsBatch({ runIds: pendingRunIds });
+    
+    // Mark cancelled tasks as resolved with timeout status
+    for (const state of stillPendingStates) {
+      state.status = 'resolved';
+      state.result = finalizeErroredTask({
+        task: state.task,
+        startedAt: state.startedAt,
+        comparisonId,
+        onProgress,
+        status: 'timeout',
+        error: `Analysis deadline exceeded - scraping cancelled`,
+      });
     }
   }
 

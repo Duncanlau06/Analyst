@@ -90,3 +90,26 @@ export async function getTinyfishRunsBatch({ runIds, timeoutMs = 10000 }) {
     logMeta: { runCount: runIds.length },
   });
 }
+
+export async function cancelTinyfishRun({ runId, timeoutMs = 5000 }) {
+  try {
+    return await tinyfishRequest(`/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+      timeoutMs,
+      logMeta: { runId },
+    });
+  } catch (error) {
+    // Cancellation failures are non-critical; log and continue
+    logger.warn('TinyFish run cancellation failed', { runId, message: error.message });
+    return null;
+  }
+}
+
+export async function cancelTinyfishRunsBatch({ runIds, timeoutMs = 10000 }) {
+  try {
+    await Promise.all(runIds.map((runId) => cancelTinyfishRun({ runId, timeoutMs: 2000 })));
+  } catch (error) {
+    // Batch cancellation failures are non-critical
+    logger.warn('TinyFish batch cancellation failed', { runCount: runIds.length, message: error.message });
+  }
+}
