@@ -1,53 +1,37 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 
 const LiveTicker = ({ items }) => {
   const scrollRef = useRef(null);
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    if (scrollRef.current && !isHovered) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     }
-  }, [items, isHovered]);
+  }, [items]);
+
+  const renderedItems = useMemo(
+    () =>
+      items.map((item, index) => ({
+        id: `${index}-${item}`,
+        label: item,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      })),
+    [items]
+  );
 
   return (
-    <div 
-      style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, height: '48px',
-        background: 'rgba(0, 5, 15, 0.95)', borderTop: '1px solid #333',
-        display: 'flex', alignItems: 'center', fontFamily: 'monospace',
-        zIndex: 1000, padding: '0 24px', whiteSpace: 'nowrap', overflow: 'hidden'
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div style={{ color: 'var(--accent-amber)', fontWeight: 'bold', marginRight: '16px' }}>
-        LIVE INTELLIGENCE ►
-      </div>
-      
-      <div 
-        ref={scrollRef}
-        style={{
-          flex: 1, overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: '32px',
-          scrollBehavior: 'smooth', ...scrollerCSS
-        }}
-      >
-        {items.map((item, idx) => (
-          <span key={idx} style={{ color: 'var(--text-primary)' }}>
-            <span style={{ color: '#00ff88', marginRight: '6px' }}>
-              [{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}]
-            </span>
-            {item}
+    <div className="ticker-shell">
+      <div className="ticker-label">Live Analysis Feed</div>
+      <div ref={scrollRef} className="ticker-track">
+        {renderedItems.map((item) => (
+          <span key={item.id} className="ticker-item">
+            <span className="ticker-time">[{item.time}]</span>
+            <span>{item.label}</span>
           </span>
         ))}
       </div>
     </div>
   );
-};
-
-const scrollerCSS = {
-  scrollbarWidth: 'none',
-  msOverflowStyle: 'none'
 };
 
 export default LiveTicker;
