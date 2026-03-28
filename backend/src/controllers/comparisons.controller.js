@@ -1,6 +1,31 @@
 import { analyzeComparison } from '../services/comparison-orchestrator.service.js';
 import { asyncHandler, AppError } from '../utils/errors.js';
 
+function toCompany(option) {
+  if (!option?.id || !option?.name) {
+    return null;
+  }
+
+  return {
+    id: String(option.id),
+    name: String(option.name),
+    color: option.color || null,
+  };
+}
+
+function normalizeComparisonBody(body) {
+  const companyA = toCompany(body.companyA) || toCompany(body.leftOption);
+  const companyB = toCompany(body.companyB) || toCompany(body.rightOption);
+
+  return {
+    ...body,
+    companyA,
+    companyB,
+    leftOption: toCompany(body.leftOption) || companyA,
+    rightOption: toCompany(body.rightOption) || companyB,
+  };
+}
+
 function validateComparisonBody(body) {
   const { companyA, companyB, query } = body;
 
@@ -10,7 +35,8 @@ function validateComparisonBody(body) {
 }
 
 export const analyzeComparisonController = asyncHandler(async (req, res) => {
-  validateComparisonBody(req.body);
-  const response = await analyzeComparison(req.body);
+  const normalizedBody = normalizeComparisonBody(req.body);
+  validateComparisonBody(normalizedBody);
+  const response = await analyzeComparison(normalizedBody);
   res.json(response);
 });

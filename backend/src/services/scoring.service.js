@@ -2,6 +2,28 @@ function clamp(value, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
 }
 
+function normalizeConfidence(value, fallback = 0.5) {
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    return clamp(numericValue);
+  }
+
+  return fallback;
+}
+
+function normalizeSentiment(value, fallback = 0.5) {
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    return clamp(numericValue);
+  }
+
+  return fallback;
+}
+
+function sentimentToScore(value) {
+  return Math.round(normalizeSentiment(value) * 100);
+}
+
 function computeMentionScore(text, companyName) {
   const normalizedText = text.toLowerCase();
   const normalizedCompany = companyName.toLowerCase();
@@ -51,5 +73,62 @@ export function buildHeuristicComparisonResult({ companyA, companyB, evidence })
       winner: scoreA === scoreB ? 'tie' : scoreA > scoreB ? companyA.id : companyB.id,
       overview: `Fallback sentiment generated from scraped articles and comments for ${companyA.name} versus ${companyB.name}.`,
     },
+  };
+}
+
+export function buildNoEvidenceComparisonResult({ companyA, companyB, waitMs }) {
+  return {
+    [companyA.id]: {
+      sentiment: 0.5,
+      confidence: 0.2,
+      key_reason: `TinyFish did not return enough completed evidence for ${companyA.name} within ${Math.round(waitMs / 1000)} seconds.`,
+    },
+    [companyB.id]: {
+      sentiment: 0.5,
+      confidence: 0.2,
+      key_reason: `TinyFish did not return enough completed evidence for ${companyB.name} within ${Math.round(waitMs / 1000)} seconds.`,
+    },
+    summary: {
+      winner: 'tie',
+      overview: `TinyFish-only mode timed out before enough evidence was collected for ${companyA.name} versus ${companyB.name}.`,
+    },
+  };
+}
+
+export function formatComparisonResultForFrontend({ companyA, companyB, rawResult }) {
+  if (rawResult?.left && rawResult?.right) {
+    return rawResult;
+  }
+
+  const leftRaw = rawResult?.[companyA.id] || {};
+  const rightRaw = rawResult?.[companyB.id] || {};
+  const summary = rawResult?.summary || {};
+
+  const leftConfidence = normalizeConfidence(leftRaw.confidence, 0.5);
+  const rightConfidence = normalizeConfidence(rightRaw.confidence, 0.5);
+
+  let winner = 'tie';
+  if (summary.winner === companyA.id) {
+    winner = 'left';
+  } else if (summary.winner === companyB.id) {
+    winner = 'right';
+  }
+
+  return {
+    left: {
+      id: companyA.id,
+      name: companyA.name,
+      score: sentimentToScore(leftRaw.sentiment),
+      reason: leftRaw.key_reason || `Evidence currently gives ${companyA.name} a balanced fit score.`,
+    },
+    right: {
+      id: companyB.id,
+      name: companyB.name,
+      score: sentimentToScore(rightRaw.sentiment),
+      reason: rightRaw.key_reason || `Evidence currently gives ${companyB.name} a balanced fit score.`,
+    },
+    winner,
+    comparison_summary: summary.overview || `Comparison generated for ${companyA.name} versus ${companyB.name}.`,
+    confidence: Number(((leftConfidence + rightConfidence) / 2).toFixed(2)),
   };
 }

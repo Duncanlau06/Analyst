@@ -2,24 +2,37 @@ import { env, hasTinyfish } from '../config/env.js';
 import { AppError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
-async function tinyfishRequest(body) {
+function buildTinyfishHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'X-API-Key': env.tinyfishApiKey,
+  };
+}
+
+function buildAutomationBody(body) {
+  return {
+    url: body.url,
+    goal: body.goal,
+    browser_profile: body.browserProfile || 'lite',
+  };
+}
+
+async function tinyfishRequest(path, options = {}) {
   if (!hasTinyfish) {
     throw new AppError('TINYFISH_API_KEY not configured', 500);
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), env.tinyfishTimeoutMs);
+  const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : env.tinyfishTimeoutMs;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    logger.info('TinyFish request started', { url: body.url, timeoutMs: env.tinyfishTimeoutMs });
+    logger.info('TinyFish request started', { path, timeoutMs, meta: options.logMeta || null });
 
-    const response = await fetch(`${env.tinyfishBaseUrl}/automation/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': env.tinyfishApiKey,
-      },
-      body: JSON.stringify(body),
+    const response = await fetch(`${env.tinyfishBaseUrl}${path}`, {
+      method: options.method || 'GET',
+      headers: buildTinyfishHeaders(),
+      body: options.body ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
     });
 
@@ -29,21 +42,51 @@ async function tinyfishRequest(body) {
     }
 
     const result = await response.json();
-    logger.info('TinyFish request completed', { url: body.url });
+    logger.info('TinyFish request completed', { path, meta: options.logMeta || null });
     return result;
   } catch (error) {
     if (error.name === 'AbortError') {
-      logger.warn('TinyFish request timed out', { url: body.url, timeoutMs: env.tinyfishTimeoutMs });
-      throw new AppError(`TinyFish request timed out after ${env.tinyfishTimeoutMs}ms`, 504);
+      logger.warn('TinyFish request timed out', { path, timeoutMs, meta: options.logMeta || null });
+      throw new AppError(`TinyFish request timed out after ${timeoutMs}ms`, 504);
     }
 
-    logger.error('TinyFish request failed', { url: body.url, message: error.message });
+    logger.error('TinyFish request failed', { path, message: error.message, meta: options.logMeta || null });
     throw error;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-export async function runTinyfishAutomation({ url, goal }) {
-  return tinyfishRequest({ url, goal });
+export async function runTinyfishAutomation({ url, goal, timeoutMs, browserProfile = 'lite' }) {
+  return tinyfishRequest('/automation/run', {
+    method: 'POST',
+    body: buildAutomationBody({ url, goal, browserProfile }),
+    timeoutMs,
+    logMeta: { url },
+  });
+}
+
+export async function startTinyfishAutomation({ url, goal, timeoutMs = 10000, browserProfile = 'lite' }) {
+  return tinyfishRequest('/automation/run-async', {
+    method: 'POST',
+    body: buildAutomationBody({ url, goal, browserProfile }),
+    timeoutMs,
+    logMeta: { url },
+  });
+}
+
+export async function getTinyfishRun({ runId, timeoutMs = 10000 }) {
+  return tinyfishRequest(`/runs/${encodeURIComponent(runId)}`, {
+    timeoutMs,
+    logMeta: { runId },
+  });
+}
+
+export async function getTinyfishRunsBatch({ runIds, timeoutMs = 10000 }) {
+  return tinyfishRequest('/runs/batch', {
+    method: 'POST',
+    body: { run_ids: runIds },
+    timeoutMs,
+    logMeta: { runCount: runIds.length },
+  });
 }

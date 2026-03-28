@@ -24,7 +24,7 @@ function App() {
 
   return (
     <div style={{ paddingBottom: '64px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header isRunning={isRunning} lastRun={lastRun} />
+      <Header isRunning={isRunning} lastRun={lastRun} activeCount={comparisons.length} />
 
       <main style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0 20px', flex: 1 }}>
         <ComparisonSelector onAdd={addComparison} activeCount={comparisons.length} />

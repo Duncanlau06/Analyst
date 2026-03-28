@@ -15,19 +15,21 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
       if (comp.status === 'complete') continue;
       
       const query = comp.query;
+      const leftOption = comp.leftOption;
+      const rightOption = comp.rightOption;
       addTickerItem(`Initiating pipeline for: ${query}`);
       
       try {
         if (useMock || import.meta.env.VITE_MOCK_MODE === 'true') {
           // Simulate latency
-          addTickerItem(`Scraping EV News for ${comp.companyA.name} and ${comp.companyB.name}...`);
+          addTickerItem(`Scraping EV News for ${leftOption.name} and ${rightOption.name}...`);
           await new Promise(r => setTimeout(r, 1000));
           addTickerItem(`Parsing Yahoo Finance comments...`);
           await new Promise(r => setTimeout(r, 800));
           addTickerItem(getMockTickerData(query));
           await new Promise(r => setTimeout(r, 1200));
 
-          const results = generateMockResult(query, comp.companyA, comp.companyB);
+          const results = generateMockResult(query, leftOption, rightOption);
           addTickerItem(`Sentiment analysis complete for ${query}`);
           
           updateComparisonResult(comp.id, { status: 'complete', results });
@@ -39,8 +41,10 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               query,
-              companyA: comp.companyA,
-              companyB: comp.companyB,
+              leftOption,
+              rightOption,
+              companyA: leftOption,
+              companyB: rightOption,
               includeComments: true,
               sources: ['news', 'financial', 'social']
             })
