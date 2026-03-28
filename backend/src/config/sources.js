@@ -24,26 +24,6 @@ export const sourceCatalog = {
     },
   ],
   news: [
-    {
-      id: 'google-news',
-      label: 'Google News',
-      priority: 80,
-      url: 'https://news.google.com/search?q=',
-      weight: 0.8,
-      buildUrl: (query) => `https://news.google.com/search?q=${encodeURIComponent(query)}`,
-      goal: (query) =>
-        `Extract 2 top search results for "${query}". JSON: [{title, url}]`,
-    },
-    {
-      id: 'reuters-search',
-      label: 'Reuters',
-      priority: 50,
-      url: 'https://www.reuters.com/site-search/',
-      weight: 0.9,
-      buildUrl: (query) => `https://www.reuters.com/site-search/?query=${encodeURIComponent(query)}`,
-      goal: (query) =>
-        `Extract 2 top results for "${query}". JSON: [{title, url}]`,
-    },
   ],
   financial: [],
 };
@@ -59,7 +39,7 @@ export const sentimentCatalog = {
       weight: 1.5,
       buildUrl: (query) => `https://www.reddit.com/search/?q=${encodeURIComponent(query)}`,
       goal: (query) =>
-        `Extract sentiment data from top 2 posts for "${query}". Return ONLY: JSON: [{text, sentiment}] where sentiment is positive/negative/neutral.`,
+        `Extract sentiment data from top 5 comments on 1 post for "${query}". Return ONLY: JSON: [{text, sentiment}] where sentiment is positive/negative/neutral.`,
     },
     {
       id: 'twitter-x',
@@ -70,7 +50,7 @@ export const sentimentCatalog = {
       weight: 1.4,
       buildUrl: (query) => `https://x.com/search?q=${encodeURIComponent(query)}&src=typed_query&f=live`,
       goal: (query) =>
-        `Extract sentiment data from top 2 posts for "${query}". Return ONLY: JSON: [{text, sentiment}] where sentiment is positive/negative/neutral.`,
+        `Extract sentiment data from top 5 comments on 1 post for "${query}". Return ONLY: JSON: [{text, sentiment}] where sentiment is positive/negative/neutral.`,
     },
   ],
 };

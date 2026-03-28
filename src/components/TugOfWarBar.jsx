@@ -63,7 +63,9 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
               width: `100%`,
               background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.8), #2563eb)'
             }}
-          />
+          >
+            <span className="score-percentage">{Math.round(leftPercent)}%</span>
+          </div>
         </Tooltip>
         <div className="score-divider" style={{ left: `${leftPercent}%` }} />
         <Tooltip data={rightData} side="right" width={rightPercent}>
@@ -73,7 +75,9 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
               width: `100%`,
               background: 'linear-gradient(270deg, rgba(239, 68, 68, 0.8), #dc2626)'
             }}
-          />
+          >
+            <span className="score-percentage">{Math.round(rightPercent)}%</span>
+          </div>
         </Tooltip>
       </div>
 

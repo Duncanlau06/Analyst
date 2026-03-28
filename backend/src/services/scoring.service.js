@@ -85,43 +85,103 @@ function buildDetailedAnalysisReason(evidenceText, companyName, otherCompanyName
   const normalizedText = evidenceText.toLowerCase();
   const normalizedCompany = companyName.toLowerCase();
   
-  const positiveIndicators = ['growth', 'innovative', 'leading', 'strong', 'profit', 'popular', 'efficient', 'premium', 'best'];
-  const negativeIndicators = ['recall', 'lawsuit', 'delay', 'loss', 'weak', 'decline', 'expensive', 'problem', 'complaint'];
+  const positiveTerms = {
+    performance: ['fast', 'speed', 'efficient', 'performance', 'powerful', 'optimized'],
+    quality: ['quality', 'reliable', 'stable', 'robust', 'excellent', 'superior'],
+    innovation: ['innovative', 'cutting-edge', 'advanced', 'new features', 'breakthrough'],
+    userSatisfaction: ['satisfied', 'happy', 'love', 'great', 'amazing', 'best', 'preferred', 'recommended'],
+    adoption: ['growing', 'popular', 'adoption', 'trending', 'gaining', 'leading'],
+    pricing: ['affordable', 'cheap', 'inexpensive', 'competitive pricing', 'value'],
+  };
   
-  const foundPositive = positiveIndicators.filter(word => normalizedText.includes(word));
-  const foundNegative = negativeIndicators.filter(word => normalizedText.includes(word));
+  const negativeTerms = {
+    performance: ['slow', 'lag', 'crash', 'buggy', 'glitch', 'error'],
+    quality: ['unreliable', 'unstable', 'poor quality', 'failing', 'broken'],
+    issues: ['recall', 'lawsuit', 'scandal', 'issue', 'problem', 'complaint', 'negative'],
+    adoption: ['declining', 'losing', 'decline', 'deprecated', 'dying'],
+    pricing: ['expensive', 'costly', 'overpriced', 'high cost'],
+  };
   
-  let analysis = '';
+  // Find which categories have evidence
+  const foundPositive = [];
+  const foundNegative = [];
   
-  const scoreDiff = score - otherScore;
-  
-  if (scoreDiff > 0.1) {
-    // Significantly better
-    analysis = `${companyName} has notably stronger market position compared to ${otherCompanyName}. `;
-    if (foundPositive.length > 0) {
-      analysis += `${companyName} shows advantages in ${foundPositive.slice(0, 2).join(' and ')}. `;
-    }
-    analysis += `This translates to better competitive standing.`;
-  } else if (scoreDiff < -0.1) {
-    // Significantly worse
-    analysis = `${companyName} faces tougher competitive challenges versus ${otherCompanyName}. `;
-    if (foundNegative.length > 0) {
-      analysis += `Issues include ${foundNegative.slice(0, 2).join(' and ')}. `;
-    }
-    analysis += `${otherCompanyName} appears to have the advantage in current market dynamics.`;
-  } else {
-    // Closely matched
-    analysis = `${companyName} and ${otherCompanyName} are competitively similar. `;
-    if (foundPositive.length > foundNegative.length) {
-      analysis += `${companyName} shows slightly positive momentum with ${foundPositive[0] || 'positive indicators'}.`;
-    } else if (foundNegative.length > foundPositive.length) {
-      analysis += `${companyName} faces some headwinds, though comparable to ${otherCompanyName}.`;
-    } else {
-      analysis += `Both show mixed signals in current reporting.`;
+  for (const [category, terms] of Object.entries(positiveTerms)) {
+    for (const term of terms) {
+      if (normalizedText.includes(term)) {
+        foundPositive.push({ category, term });
+        break;
+      }
     }
   }
   
-  return analysis;
+  for (const [category, terms] of Object.entries(negativeTerms)) {
+    for (const term of terms) {
+      if (normalizedText.includes(term)) {
+        foundNegative.push({ category, term });
+        break;
+      }
+    }
+  }
+  
+  let reasons = [];
+  
+  // Build specific reasons
+  if (foundPositive.length > 0) {
+    const categories = foundPositive.map(p => p.category).slice(0, 2);
+    if (categories.includes('userSatisfaction')) {
+      reasons.push(`Users report strong satisfaction with ${companyName}`);
+    }
+    if (categories.includes('performance')) {
+      reasons.push(`${companyName} delivers superior performance and speed`);
+    }
+    if (categories.includes('innovation')) {
+      reasons.push(`${companyName} leads with innovative features`);
+    }
+    if (categories.includes('adoption')) {
+      reasons.push(`${companyName} has strong market momentum and adoption`);
+    }
+    if (categories.includes('pricing')) {
+      reasons.push(`${companyName} offers better value for the price`);
+    }
+  }
+  
+  if (foundNegative.length > 0) {
+    const categories = foundNegative.map(n => n.category).slice(0, 1);
+    if (categories.includes('performance')) {
+      reasons.push(`${companyName} faces performance and reliability issues`);
+    }
+    if (categories.includes('quality')) {
+      reasons.push(`Quality concerns reported with ${companyName}`);
+    }
+    if (categories.includes('adoption')) {
+      reasons.push(`${companyName} is experiencing market decline`);
+    }
+    if (categories.includes('pricing')) {
+      reasons.push(`${companyName} carries a significant cost premium`);
+    }
+  }
+  
+  // If no specific reasons found, provide comparative statement
+  if (reasons.length === 0) {
+    const scoreDiff = score - otherScore;
+    if (scoreDiff > 0.15) {
+      reasons.push(`${companyName} demonstrates stronger overall market position than ${otherCompanyName}`);
+      reasons.push(`Evidence suggests ${companyName} has better competitive advantages`);
+    } else if (scoreDiff < -0.15) {
+      reasons.push(`${otherCompanyName} outperforms ${companyName} based on available evidence`);
+      reasons.push(`${companyName} lags in current market dynamics`);
+    } else {
+      reasons.push(`${companyName} and ${otherCompanyName} are closely competitive`);
+    }
+  }
+  
+  // Ensure we have 2-3 reasons
+  while (reasons.length < 2 && foundPositive.length + foundNegative.length > 0) {
+    reasons.push(`Additional evidence supports choosing ${companyName} over ${otherCompanyName}`);
+  }
+  
+  return reasons.slice(0, 3).join('. ') + '.';
 }
 
 export function buildHeuristicComparisonResult({ companyA, companyB, evidence }) {
@@ -141,16 +201,17 @@ export function buildHeuristicComparisonResult({ companyA, companyB, evidence })
   
   if (scoreA > scoreB) {
     winner = companyA.id;
-    recommendationText = `Choose ${companyA.name}. Based on current market evidence, ${companyA.name} demonstrates stronger competitive positioning and better market reception compared to ${companyB.name}.`;
+    recommendationText = `Choose ${companyA.name}. ${reasonA.split('.')[0]}. This gives ${companyA.name} a clear advantage over ${companyB.name} in current market conditions.`;
   } else if (scoreB > scoreA) {
     winner = companyB.id;
-    recommendationText = `Choose ${companyB.name}. Based on current market evidence, ${companyB.name} demonstrates stronger competitive positioning and better market reception compared to ${companyA.name}.`;
+    recommendationText = `Choose ${companyB.name}. ${reasonB.split('.')[0]}. This gives ${companyB.name} a clear advantage over ${companyA.name} in current market conditions.`;
   } else {
     // When tied, pick the first company but note slight preference
     winner = scoreA > 0.5 ? companyA.id : companyB.id;
     const recommendedCompany = winner === companyA.id ? companyA.name : companyB.name;
+    const recommendedReason = winner === companyA.id ? reasonA : reasonB;
     const otherCompany = winner === companyA.id ? companyB.name : companyA.name;
-    recommendationText = `Choose ${recommendedCompany}. Both companies show similar market dynamics, but ${recommendedCompany} has a slight edge in current sentiment versus ${otherCompany}.`;
+    recommendationText = `Choose ${recommendedCompany}. ${recommendedReason.split('.')[0]}. While ${otherCompany} is competitive, ${recommendedCompany} demonstrates better positioning.`;
   }
 
   return {

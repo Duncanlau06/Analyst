@@ -261,7 +261,7 @@ export async function analyzeComparison(payload) {
     companyA,
     companyB,
     includeComments = true,
-    sources = ['news', 'financial', 'social'],
+    sources = ['social'],
   } = payload;
 
   const timeline = [];

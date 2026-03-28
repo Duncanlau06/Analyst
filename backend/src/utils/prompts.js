@@ -8,37 +8,36 @@ export function buildSentimentPrompt({ companyA, companyB, normalizedEvidence })
     .join('\n');
 
   return `
-You are analyzing and comparing ${companyA.name} versus ${companyB.name} based on recent evidence and user sentiment.
+You are analyzing and comparing ${companyA.name} versus ${companyB.name} based on recent user feedback and market evidence.
 
-Your task is to provide a COMPARATIVE analysis explaining why one option is specifically better than the other in practical, measurable ways.
+Your task is to provide SPECIFIC, CONCRETE reasons why one is objectively better than the other.
 
 Return JSON only in this exact shape:
 {
   "${companyA.id}": {
     "sentiment": 0.0,
     "confidence": 0.0,
-    "key_reason": "Why ${companyA.name} is the better choice compared to ${companyB.name}. Be specific: cite 2-3 concrete advantages from the evidence (e.g., better user satisfaction, stronger performance metrics, lower pricing, superior product features, better market reception). Explain HOW ${companyA.name} outperforms ${companyB.name} on these factors."
+    "key_reason": "Specific, concrete reasons to choose ${companyA.name} over ${companyB.name}. Format: '${companyA.name} is better because: [REASON 1] - [cite specific evidence]. [REASON 2] - [cite specific evidence]. [REASON 3] - [cite specific evidence].' Make comparison explicit: 'Unlike ${companyB.name}, ${companyA.name}...'"
   },
   "${companyB.id}": {
     "sentiment": 0.0,
     "confidence": 0.0,
-    "key_reason": "Why ${companyB.name} is the better choice compared to ${companyA.name}. Be specific: cite 2-3 concrete advantages from the evidence (e.g., better user satisfaction, stronger performance metrics, lower pricing, superior product features, better market reception). Explain HOW ${companyB.name} outperforms ${companyA.name} on these factors."
+    "key_reason": "Specific, concrete reasons to choose ${companyB.name} over ${companyA.name}. Format: '${companyB.name} is better because: [REASON 1] - [cite specific evidence]. [REASON 2] - [cite specific evidence]. [REASON 3] - [cite specific evidence].' Make comparison explicit: 'Unlike ${companyA.name}, ${companyB.name}...'"
   },
   "summary": {
     "winner": "MUST be ${companyA.id} or ${companyB.id} (never 'tie'). Pick the clear winner.",
-    "overview": "Recommendation: Choose ${companyA.name} OR Choose ${companyB.name}. Explain in 2-3 sentences the top 2-3 specific reasons why the winner is objectively better. Focus on measurable differences: product quality advantages, user satisfaction levels, pricing/value, innovation, reliability, or market performance. Make it clear and actionable."
+    "overview": "STRONG RECOMMENDATION statement: 'Choose ${companyA.name} because [TOP REASON with evidence]. [Second reason]. [Why this matters vs ${companyB.name}].' Be decisive and specific. If ${companyA.name} leads, state specific advantages. If tied, pick one and explain slight edge. Never say 'similar' or 'comparable'."
   }
 }
 
-Critical Rules:
-- ALWAYS pick a winner. There is no tie.
-- Sentiment: 0-1 scale rating how favorable the evidence is toward that company.
-- Confidence: Rate how strongly the evidence supports this conclusion. 0.8+ = strong consensus; 0.6-0.7 = moderate; below 0.6 = weak.
-- COMPARATIVE analysis only: Each reason must compare the two companies directly. Don't describe them in isolation.
-- Cite specific evidence: Reference actual findings from articles and user feedback.
-- Weight real user sentiment (social) heavily - it's the most reliable indicator of satisfaction.
-- Be direct: State which company is objectively better and why, without hedging.
-- No mentions of data collection, scraping, or analysis limitations.
+Critical Rules for Reasons:
+- MUST cite SPECIFIC evidence from the text (e.g., 'Users report 95% satisfaction vs 87%', 'Offers 40% faster processing', 'Costs $20/month vs $50/month')
+- MUST make direct comparative statements (e.g., 'Better at X than Y', 'Lacks Y which Z has')
+- MUST include 3 distinct concrete reasons with evidence
+- Format: "Reason 1 (concrete fact). Reason 2 (concrete fact). Reason 3 (concrete fact)."
+- NO vague statements like "shows momentum" or "positive reception"
+- NO hedging language
+- Weight user feedback (social) heavily for real performance indicators
 
 Evidence:
 ${evidenceText}
@@ -47,40 +46,35 @@ ${evidenceText}
 
 export function buildFallbackComparisonPrompt({ companyA, companyB, query }) {
   return `
-You are helping a user choose between "${companyA.name}" and "${companyB.name}" for this specific need: "${query}"
+You are helping a user choose between "${companyA.name}" and "${companyB.name}" for: "${query}"
 
-Provide a clear RECOMMENDATION of one option, with specific reasons why it's the better choice.
+Provide SPECIFIC, CONCRETE reasons why one option is objectively better than the other.
 
 Return JSON only in this exact shape:
 {
   "${companyA.id}": {
     "sentiment": 0.0,
     "confidence": 0.0,
-    "key_reason": "Explain why ${companyA.name} is better than ${companyB.name} for this use case. Be specific: State 2-3 concrete advantages (e.g., better features for the stated need, superior pricing, stronger ecosystem, better performance, superior reliability). Directly compare: explicitly say HOW ${companyA.name} beats ${companyB.name} on these factors."
+    "key_reason": "Specific reasons to choose ${companyA.name} over ${companyB.name}. Format: '${companyA.name} is better because: [REASON 1 with specifics] - [example or stat]. [REASON 2 with specifics] - [example or stat]. [REASON 3 with specifics] - [example or stat].' Make it direct: 'Unlike ${companyB.name}, ${companyA.name}...'"
   },
   "${companyB.id}": {
     "sentiment": 0.0,
     "confidence": 0.0,
-    "key_reason": "Explain why ${companyB.name} is better than ${companyA.name} for this use case. Be specific: State 2-3 concrete advantages (e.g., better features for the stated need, superior pricing, stronger ecosystem, better performance, superior reliability). Directly compare: explicitly say HOW ${companyB.name} beats ${companyA.name} on these factors."
+    "key_reason": "Specific reasons to choose ${companyB.name} over ${companyA.name}. Format: '${companyB.name} is better because: [REASON 1 with specifics] - [example or stat]. [REASON 2 with specifics] - [example or stat]. [REASON 3 with specifics] - [example or stat].' Make it direct: 'Unlike ${companyA.name}, ${companyB.name}...'"
   },
   "summary": {
-    "winner": "MUST be either ${companyA.id} or ${companyB.id} (never 'tie'). Choose the objectively better option for the stated need.",
-    "overview": "Recommendation: Choose ${companyA.name} OR Choose ${companyB.name}. Explain in 2-3 sentences the top 2-3 specific reasons this option is objectively better for the stated use case. Be direct and actionable."
+    "winner": "MUST be ${companyA.id} or ${companyB.id} (never 'tie'). Pick the objectively better option.",
+    "overview": "STRONG RECOMMENDATION: 'Choose ${companyA.name} for '${query}' because [TOP REASON 1 specific to the query]. [TOP REASON 2]. [Why this beats ${companyB.name}].' Be decisive. State clear advantage for the stated use case. No hedging."
   }
 }
 
-Critical Rules:
-- ALWAYS pick a winner. There is no tie.
-- Sentiment (0-1): How well each option fits the stated need. Higher = better fit for the query.
-- Confidence: 0.7-0.85 for most mainstream comparisons; lower only if truly ambiguous.
-- COMPARATIVE analysis: Each advantage must explicitly compare the two options.
-- Direct recommendation: Your summary must clearly state which one to choose and why.
-- Focus on practical fit: What makes one option objectively better for "${query}"?
-- Mention specific features, pricing tiers, ecosystem strengths, or use-case fit as relevant.
-- Be confident: Only hedge on confidence score if the choice truly depends on personal preference.
-- No disclaimers: Don't mention limitations, missing data, or that real-time info is unavailable.
-
-Use Case: "${query}"
-Comparison: ${companyA.name} vs ${companyB.name}
+Critical Rules for Reasons:
+- MUST provide 3 CONCRETE, SPECIFIC reasons with details
+- MUST compare directly (e.g., 'Better at X than Y', 'Has feature Z which ${companyB.name} lacks')
+- Reasons MUST be based on: features relevant to ${query}, pricing, ecosystem, performance, reliability, ease of use
+- Format example: '${companyA.name} offers API integration (${companyB.name} requires manual setup). Has 50+ pre-built templates (vs 10). Costs $30/month (${companyB.name} is $60).'
+- NO vague language like 'better overall' or 'more popular'
+- Be specific about HOW it's better for this use case
+- Make summary a strong, decisive recommendation
   `.trim();
 }
