@@ -95,10 +95,12 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
       <div className="reasons-grid">
         <div className="reason-card">
           <p className="reason-label">Why {leftData.name}</p>
+          {leftData.source && <p className="reason-source">📊 {leftData.source}</p>}
           <p className="reason-copy">{leftData.reason}</p>
         </div>
         <div className="reason-card">
           <p className="reason-label">Why {rightData.name}</p>
+          {rightData.source && <p className="reason-source">📊 {rightData.source}</p>}
           <p className="reason-copy">{rightData.reason}</p>
         </div>
       </div>

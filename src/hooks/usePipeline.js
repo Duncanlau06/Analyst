@@ -42,12 +42,14 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
             left: {
               name: comp.leftOption.name,
               score: leftScore,
-              reason: leftRaw.key_reason || 'No detailed reason available.'
+              reason: leftRaw.reason || leftRaw.key_reason || 'No detailed reason available.',
+              source: leftRaw.source || 'Web research'
             },
             right: {
               name: comp.rightOption.name,
               score: rightScore,
-              reason: rightRaw.key_reason || 'No detailed reason available.'
+              reason: rightRaw.reason || rightRaw.key_reason || 'No detailed reason available.',
+              source: rightRaw.source || 'Web research'
             },
             winner: leftScore > rightScore ? 'left' : rightScore > leftScore ? 'right' : 'tie',
             confidence: (leftRaw.confidence + rightRaw.confidence) / 2,

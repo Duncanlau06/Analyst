@@ -9,7 +9,7 @@ export const sourceCatalog = {
       weight: 1.5,
       buildUrl: (query) => `https://www.reddit.com/search/?q=${encodeURIComponent(query)}`,
       goal: (query) =>
-        `Extract 2 top posts for "${query}". JSON: [{title, author, url}]`,
+        `Extract top 5 comments for 1 top post for "${query}". JSON: [{title, author, url}]`,
     },
     {
       id: 'twitter-x',
@@ -20,7 +20,7 @@ export const sourceCatalog = {
       weight: 1.4,
       buildUrl: (query) => `https://x.com/search?q=${encodeURIComponent(query)}&src=typed_query&f=live`,
       goal: (query) =>
-        `Extract 2 top posts for "${query}". JSON: [{author, text, url}]`,
+        `Extract top 5 comments from 1 top post for "${query}". JSON: [{author, text, url}]`,
     },
   ],
   news: [

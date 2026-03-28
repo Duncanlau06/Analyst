@@ -2,17 +2,17 @@ export const generateMockResult = (query, leftOption, rightOption) => {
   const getMockScore = (baseScore) => Math.min(1, Math.max(0, baseScore + (Math.random() * 0.2 - 0.1)));
   
   const reasonsA = [
-    `Strong demand expected for the ${leftOption.name} product pipeline.`,
-    `${leftOption.name} maintains technological lead in recent software update.`,
-    `Aggressive pricing strategy secures market share for ${leftOption.name}.`,
-    `Analysts praise ${leftOption.name} supply chain efficiency.`
+    `Users say: "Strong demand expected for the ${leftOption.name} product pipeline."`,
+    `Analysts report: "${leftOption.name} maintains technological lead in recent software update."`,
+    `Investment community: "Aggressive pricing strategy secures market share for ${leftOption.name}."`,
+    `Supply chain experts: "Analysts praise ${leftOption.name} supply chain efficiency."`
   ];
   
   const reasonsB = [
-    `${rightOption.name} sees explosive growth in domestic market.`,
-    `New battery technology provides ${rightOption.name} a competitive edge.`,
-    `${rightOption.name} surpasses delivery estimates for Q3.`,
-    `Global expansion plans position ${rightOption.name} well against rivals.`
+    `Users say: "${rightOption.name} sees explosive growth in domestic market."`,
+    `Tech reviewers: "New battery technology provides ${rightOption.name} a competitive edge."`,
+    `Delivery tracker data: "${rightOption.name} surpasses delivery estimates for Q3."`,
+    `Expansion strategists: "Global expansion plans position ${rightOption.name} well against rivals."`
   ];
 
   // Randomly favor one more than the other slightly based on hash of query, to keep it somewhat consistent
@@ -25,18 +25,20 @@ export const generateMockResult = (query, leftOption, rightOption) => {
       id: leftOption.id,
       name: leftOption.name,
       score: Math.round(leftScore * 100),
-      reason: reasonsA[Math.floor(Math.random() * reasonsA.length)]
+      reason: reasonsA[Math.floor(Math.random() * reasonsA.length)],
+      source: ['users', 'analysts', 'investors', 'experts'][Math.floor(Math.random() * 4)]
     },
     right: {
       id: rightOption.id,
       name: rightOption.name,
       score: Math.round(rightScore * 100),
-      reason: reasonsB[Math.floor(Math.random() * reasonsB.length)]
+      reason: reasonsB[Math.floor(Math.random() * reasonsB.length)],
+      source: ['users', 'reviewers', 'data', 'strategists'][Math.floor(Math.random() * 4)]
     },
     winner: favoredA ? 'left' : 'right',
     comparison_summary: favoredA
-      ? `${leftOption.name} looks like the stronger fit for "${query}" based on momentum, pricing, and execution signals.`
-      : `${rightOption.name} looks like the stronger fit for "${query}" based on momentum, pricing, and execution signals.`,
+      ? `What people say about ${leftOption.name}: "${reasonsA[0].split(': ')[1]}". Meanwhile, opinions on ${rightOption.name}: "${reasonsB[0].split(': ')[1]}".`
+      : `What people say about ${rightOption.name}: "${reasonsB[0].split(': ')[1]}". Meanwhile, opinions on ${leftOption.name}: "${reasonsA[0].split(': ')[1]}".`,
     confidence: getMockScore(0.82)
   };
 };

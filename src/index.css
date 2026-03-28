@@ -522,6 +522,14 @@ button {
   word-wrap: break-word;
 }
 
+.reason-source {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
 .recommendation-footer {
   margin-top: 24px;
   padding: 18px 20px;
