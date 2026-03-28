@@ -1,0 +1,60 @@
+:root {
+  --bg-primary: #060b1a;
+  --bg-card: rgba(15, 23, 42, 0.8);
+  --accent-blue: #00d4ff;
+  --accent-red: #ff3366;
+  --accent-green: #00ff88;
+  --accent-amber: #ff9500;
+  --text-primary: #e2e8f0;
+  --text-muted: #64748b;
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(0, 212, 255, 0.05), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(255, 51, 102, 0.05), transparent 25%);
+  background-attachment: fixed;
+}
+
+#root {
+  width: 100%;
+}
+
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+/* Base button styles */
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2); 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4); 
+}
