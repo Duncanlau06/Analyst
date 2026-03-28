@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react';
 import { generateMockResult, getMockTickerData } from '../services/mockData';
-import { analyzeSentimentHeuristic } from '../services/sentimentAnalyzer';
 
 export function usePipeline(updateComparisonResult, addTickerItem) {
   const [isRunning, setIsRunning] = useState(false);
 
-  const runPipeline = useCallback(async (comparisons, useMock = true) => {
+  const runPipeline = useCallback(async (comparisons, useMock = import.meta.env.VITE_MOCK_MODE === 'true') => {
     if (comparisons.length === 0) return;
     setIsRunning(true);
 
@@ -33,37 +32,37 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
           
           updateComparisonResult(comp.id, { status: 'complete', results });
         } else {
-          // Actual backend call
-          addTickerItem(`Live scraping via TinyFish for: ${query}`);
-          const scrapeResp = await fetch('/api/scrape', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ url: 'https://news.google.com', goal: `Search for ${query} and return top articles.` })
-          });
-          
-          if (!scrapeResp.ok) throw new Error('Scrape failed');
-          const scrapeData = await scrapeResp.json();
-          addTickerItem(`Scraped data received. Running sentiment engine...`);
+          addTickerItem(`Live backend analysis started for: ${query}`);
 
-          const extractedText = JSON.stringify(scrapeData.result);
-
-          // Call sentiment endpoint
-          const sentResp = await fetch('/api/sentiment', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ text: extractedText, companyA: comp.companyA.name, companyB: comp.companyB.name })
+          const analysisResp = await fetch('/api/comparisons/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query,
+              companyA: comp.companyA,
+              companyB: comp.companyB,
+              includeComments: true,
+              sources: ['news', 'financial', 'social']
+            })
           });
 
-          let results;
-          if (sentResp.ok) {
-            results = await sentResp.json();
-            addTickerItem(`OpenAI sentiment scoring successful for ${query}`);
-          } else {
-            addTickerItem(`OpenAI API failed. Falling back to heuristic engine for ${query}.`);
-            results = analyzeSentimentHeuristic(extractedText, comp.companyA.name, comp.companyB.name);
+          if (!analysisResp.ok) {
+            const errorBody = await analysisResp.json().catch(() => ({}));
+            throw new Error(errorBody.error || 'Comparison analysis failed');
           }
 
-          updateComparisonResult(comp.id, { status: 'complete', results });
+          const analysis = await analysisResp.json();
+          analysis.timeline?.forEach(item => addTickerItem(item));
+          addTickerItem(`Analysis complete with ${analysis.meta?.sourcesUsed || 0} evidence items`);
+
+          updateComparisonResult(comp.id, {
+            status: 'complete',
+            results: analysis.results,
+            comments: analysis.comments,
+            evidence: analysis.evidence,
+            backendMeta: analysis.meta,
+            comparisonRunId: analysis.comparisonId
+          });
         }
       } catch (err) {
         addTickerItem(`Error in pipeline for ${query}: ${err.message}`);

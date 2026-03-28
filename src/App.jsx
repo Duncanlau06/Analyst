@@ -18,7 +18,7 @@ function App() {
   const { runPipeline, isRunning } = usePipeline(updateComparisonResult, addTickerItem);
 
   const handleRun = () => {
-    runPipeline(comparisons, true); // Set to false to use actual API if keys exist
+    runPipeline(comparisons);
     setLastRun(new Date());
   };
 
