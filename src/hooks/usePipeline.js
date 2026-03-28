@@ -15,19 +15,21 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
       if (comp.status === 'complete') continue;
 
       const query = comp.query;
+      const leftOption = comp.leftOption;
+      const rightOption = comp.rightOption;
       addTickerItem(`Initiating pipeline for: ${query}`);
 
       try {
         if (useMock || import.meta.env.VITE_MOCK_MODE === 'true') {
           // Simulate latency
-          addTickerItem(`Scraping EV News for ${comp.leftOption.name} and ${comp.rightOption.name}...`);
+          addTickerItem(`Scraping EV News for ${comp.companyA.name} and ${comp.companyB.name}...`);
           await new Promise(r => setTimeout(r, 1000));
           addTickerItem(`Parsing Yahoo Finance comments...`);
           await new Promise(r => setTimeout(r, 800));
           addTickerItem(getMockTickerData(query));
           await new Promise(r => setTimeout(r, 1200));
 
-          const results = generateMockResult(query, comp.leftOption, comp.rightOption);
+          const results = generateMockResult(query, comp.companyA, comp.companyB);
           addTickerItem(`Sentiment analysis complete for ${query}`);
 
           updateComparisonResult(comp.id, { status: 'complete', results });

@@ -1,3 +1,4 @@
+import { env } from '../../config/env.js';
 import { sourceCatalog } from '../../config/sources.js';
 import { normalizeTinyfishResult } from '../normalization.service.js';
 import { runTinyfishAutomation } from '../tinyfish.service.js';
@@ -11,7 +12,7 @@ function platformMatches(platformFilter, source) {
   return platformFilter.includes(source.platform);
 }
 
-async function runSocialSource({ source, query, companyA, companyB, onProgress }) {
+async function runSocialSource({ source, query, companyA, companyB, onProgress, timeoutMs }) {
   onProgress(`Scraping ${source.label} discussions for ${query}`);
   const startedAt = Date.now();
 
@@ -19,6 +20,7 @@ async function runSocialSource({ source, query, companyA, companyB, onProgress }
     const runResult = await runTinyfishAutomation({
       url: source.buildUrl ? source.buildUrl(query, companyA.name, companyB.name) : `${source.url}${encodeURIComponent(query)}`,
       goal: source.goal(query, companyA.name, companyB.name),
+      timeoutMs,
     });
 
     const normalizedItems = normalizeTinyfishResult(runResult, {
@@ -58,10 +60,21 @@ async function runSocialSource({ source, query, companyA, companyB, onProgress }
   }
 }
 
-export async function fetchSocialComments({ query, companyA, companyB, platforms = [], onProgress = () => {} }) {
-  const socialSources = sourceCatalog.social.filter((source) => platformMatches(platforms, source));
+export async function fetchSocialComments({
+  query,
+  companyA,
+  companyB,
+  platforms = [],
+  onProgress = () => {},
+  maxSources = env.analysisMaxSocialSources,
+  timeoutMs = env.analysisSourceTimeoutMs,
+}) {
+  const socialSources = sourceCatalog.social
+    .filter((source) => platformMatches(platforms, source))
+    .sort((left, right) => (right.priority || 0) - (left.priority || 0))
+    .slice(0, Math.max(0, maxSources));
   const settledResults = await Promise.all(
-    socialSources.map((source) => runSocialSource({ source, query, companyA, companyB, onProgress })),
+    socialSources.map((source) => runSocialSource({ source, query, companyA, companyB, onProgress, timeoutMs })),
   );
 
   return {

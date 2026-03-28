@@ -1,8 +1,10 @@
-import { getSourcesByType } from '../config/sources.js';
+import { env } from '../config/env.js';
+import { getRankedSourcesByType } from '../config/sources.js';
 import { buildCommentItems, normalizeTinyfishResult } from './normalization.service.js';
-import { analyzeComparisonSentiment } from './sentiment.service.js';
+import { analyzeComparisonSentiment, analyzeComparisonWithoutEvidence } from './sentiment.service.js';
+import { buildNoEvidenceComparisonResult, formatComparisonResultForFrontend } from './scoring.service.js';
 import { fetchSocialComments } from './comments/social-comments.service.js';
-import { runTinyfishAutomation } from './tinyfish.service.js';
+import { getTinyfishRunsBatch, startTinyfishAutomation } from './tinyfish.service.js';
 import { comparisonStore } from './comparison-store.service.js';
 import { cache } from './cache.service.js';
 import { logger } from '../utils/logger.js';
@@ -19,50 +21,202 @@ function inferSourceType(source) {
   return source.id === 'marketwatch-search' ? 'financial' : 'news';
 }
 
-async function runSource({ source, query, companyA, companyB, comparisonId, onProgress }) {
-  onProgress(`Scraping ${source.label}`);
-  const startedSourceAt = Date.now();
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeRunStatus(status) {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'COMPLETED') return 'completed';
+  if (normalized === 'FAILED') return 'failed';
+  if (normalized === 'CANCELLED') return 'cancelled';
+  if (normalized === 'RUNNING') return 'running';
+  if (normalized === 'PENDING') return 'pending';
+  return 'unknown';
+}
+
+function createSourceTask(source, query, companyA, companyB) {
+  const sourceType = source.platform ? 'social' : inferSourceType(source);
+  return {
+    source,
+    sourceId: source.id,
+    label: source.label,
+    sourceType,
+    platform: source.platform || null,
+    url: source.buildUrl ? source.buildUrl(query, companyA.name, companyB.name) : `${source.url}${encodeURIComponent(query)}`,
+    goal: source.goal(query, companyA.name, companyB.name),
+  };
+}
+
+function finalizeCompletedTask({ task, run, startedAt, comparisonId, onProgress }) {
+  const normalizedItems = normalizeTinyfishResult(run, {
+    ...task.source,
+    sourceType: task.sourceType,
+  });
+
+  onProgress(`Collected ${normalizedItems.length} items from ${task.label}`);
+  logger.info('Source scrape completed', { comparisonId, source: task.sourceId, itemCount: normalizedItems.length });
+  return {
+    evidence: normalizedItems,
+    sourceResult: {
+      sourceId: task.sourceId,
+      label: task.label,
+      sourceType: task.sourceType,
+      platform: task.platform,
+      status: 'success',
+      itemCount: normalizedItems.length,
+      durationMs: Date.now() - startedAt,
+    },
+  };
+}
+
+function finalizeErroredTask({ task, startedAt, comparisonId, onProgress, status, error }) {
+  onProgress(`Skipping ${task.label}: ${error}`);
+  logger.warn('Source scrape failed', { comparisonId, source: task.sourceId, message: error });
+  return {
+    evidence: [],
+    sourceResult: {
+      sourceId: task.sourceId,
+      label: task.label,
+      sourceType: task.sourceType,
+      platform: task.platform,
+      status,
+      itemCount: 0,
+      durationMs: Date.now() - startedAt,
+      error,
+    },
+  };
+}
+
+async function startTaskRun({ task, comparisonId, onProgress }) {
+  const startedAt = Date.now();
+  onProgress(`Queueing ${task.label}`);
 
   try {
-    const runResult = await runTinyfishAutomation({
-      url: source.buildUrl ? source.buildUrl(query, companyA.name, companyB.name) : source.url,
-      goal: source.goal(query, companyA.name, companyB.name),
+    const startResponse = await startTinyfishAutomation({
+      url: task.url,
+      goal: task.goal,
+      timeoutMs: 10000,
+      browserProfile: 'lite',
     });
 
-    const normalizedItems = normalizeTinyfishResult(runResult, {
-      ...source,
-      sourceType: inferSourceType(source),
-    });
+    const runId = startResponse.run_id || startResponse.id || startResponse.runId;
+    if (!runId) {
+      throw new Error('TinyFish did not return a run_id');
+    }
 
-    onProgress(`Collected ${normalizedItems.length} items from ${source.label}`);
-    logger.info('Source scrape completed', { comparisonId, source: source.id, itemCount: normalizedItems.length });
-    return {
-      evidence: normalizedItems,
-      sourceResult: {
-        sourceId: source.id,
-        label: source.label,
-        sourceType: inferSourceType(source),
-        status: 'success',
-        itemCount: normalizedItems.length,
-        durationMs: Date.now() - startedSourceAt,
-      },
-    };
+    onProgress(`Started ${task.label}`);
+    return { startedAt, task, runId, status: 'queued' };
   } catch (error) {
-    onProgress(`Skipping ${source.label}: ${error.message}`);
-    logger.warn('Source scrape failed', { comparisonId, source: source.id, message: error.message });
     return {
-      evidence: [],
-      sourceResult: {
-        sourceId: source.id,
-        label: source.label,
-        sourceType: inferSourceType(source),
+      startedAt,
+      task,
+      status: 'resolved',
+      result: finalizeErroredTask({
+        task,
+        startedAt,
+        comparisonId,
+        onProgress,
         status: error.statusCode === 504 ? 'timeout' : 'failed',
-        itemCount: 0,
-        durationMs: Date.now() - startedSourceAt,
         error: error.message,
-      },
+      }),
     };
   }
+}
+
+async function runSelectedSources({ query, companyA, companyB, comparisonId, includeComments, sources, onProgress }) {
+  const selectedStandardSources = getRankedSourcesByType(
+    sources.filter((type) => type !== 'social'),
+    env.analysisMaxSources,
+  );
+  const selectedSocialSources = sources.includes('social')
+    ? getRankedSourcesByType(['social'], env.analysisMaxSocialSources)
+    : [];
+
+  const tasks = [
+    ...selectedStandardSources.map((source) => createSourceTask(source, query, companyA, companyB)),
+    ...(includeComments ? selectedSocialSources.map((source) => createSourceTask(source, query, companyA, companyB)) : []),
+  ];
+  const runStates = await Promise.all(tasks.map((task) => startTaskRun({ task, comparisonId, onProgress })));
+  const deadlineAt = Date.now() + env.analysisPollBudgetMs;
+
+  while (Date.now() < deadlineAt) {
+    const pendingStates = runStates.filter((state) => state.status === 'queued');
+    if (pendingStates.length === 0) {
+      break;
+    }
+
+    await sleep(env.analysisPollIntervalMs);
+
+    let batchResponse;
+    try {
+      batchResponse = await getTinyfishRunsBatch({
+        runIds: pendingStates.map((state) => state.runId),
+        timeoutMs: 10000,
+      });
+    } catch (error) {
+      logger.warn('TinyFish batch polling failed', { comparisonId, message: error.message });
+      break;
+    }
+
+    const runs = Array.isArray(batchResponse?.data)
+      ? batchResponse.data
+      : Array.isArray(batchResponse?.runs)
+        ? batchResponse.runs
+        : Array.isArray(batchResponse)
+          ? batchResponse
+          : [];
+    const runsById = new Map(runs.map((run) => [run.run_id || run.id, run]));
+
+    for (const state of pendingStates) {
+      const run = runsById.get(state.runId);
+      if (!run) {
+        continue;
+      }
+
+      const status = normalizeRunStatus(run.status);
+      if (status === 'completed') {
+        state.status = 'resolved';
+        state.result = finalizeCompletedTask({
+          task: state.task,
+          run,
+          startedAt: state.startedAt,
+          comparisonId,
+          onProgress,
+        });
+      } else if (status === 'failed' || status === 'cancelled') {
+        state.status = 'resolved';
+        state.result = finalizeErroredTask({
+          task: state.task,
+          startedAt: state.startedAt,
+          comparisonId,
+          onProgress,
+          status: 'failed',
+          error: run.error || `TinyFish run ${status}`,
+        });
+      }
+    }
+  }
+
+  const settledResults = runStates.map((state) => {
+    if (state.result) {
+      return state.result;
+    }
+
+    return finalizeErroredTask({
+      task: state.task,
+      startedAt: state.startedAt,
+      comparisonId,
+      onProgress,
+      status: 'timeout',
+      error: `TinyFish run did not complete within ${env.analysisPollBudgetMs}ms`,
+    });
+  });
+
+  return {
+    evidence: settledResults.flatMap((result) => result.evidence),
+    sourceResults: settledResults.map((result) => result.sourceResult),
+  };
 }
 
 export async function analyzeComparison(payload) {
@@ -88,57 +242,45 @@ export async function analyzeComparison(payload) {
   }
 
   const comparisonId = createComparisonId();
-  const selectedSources = getSourcesByType(sources.filter((type) => type !== 'social'));
-  const evidence = [];
-  const sourceResults = [];
 
   onProgress(`Starting analysis for ${query}`);
-  logger.info('Comparison analysis started', { comparisonId, query, sourceCount: selectedSources.length, includeComments });
+  logger.info('Comparison analysis started', { comparisonId, query, sourceTypes: sources, includeComments });
 
-  const sourceRunResults = await Promise.all(
-    selectedSources.map((source) => runSource({ source, query, companyA, companyB, comparisonId, onProgress })),
-  );
-  evidence.push(...sourceRunResults.flatMap((result) => result.evidence));
-  sourceResults.push(...sourceRunResults.map((result) => result.sourceResult));
-
-  if (includeComments && sources.includes('social')) {
-    const socialResult = await fetchSocialComments({
-      query,
-      companyA,
-      companyB,
-      onProgress,
-    });
-    evidence.push(...socialResult.evidence);
-    sourceResults.push(...socialResult.sourceResults);
-  }
+  const { evidence, sourceResults } = await runSelectedSources({
+    query,
+    companyA,
+    companyB,
+    comparisonId,
+    includeComments,
+    sources,
+    onProgress,
+  });
 
   if (evidence.length === 0) {
     logger.warn('Comparison analysis produced no evidence', { comparisonId, query });
   }
 
-  let results;
+  let rawResult;
+  let fallbackMode = null;
   if (evidence.length === 0) {
-    onProgress('No evidence collected, skipping sentiment analysis');
-    results = {
-      [companyA.id]: {
-        sentiment: 0.5,
-        confidence: 0.2,
-        key_reason: `No usable evidence was collected for ${companyA.name}.`,
-      },
-      [companyB.id]: {
-        sentiment: 0.5,
-        confidence: 0.2,
-        key_reason: `No usable evidence was collected for ${companyB.name}.`,
-      },
-      summary: {
-        winner: 'tie',
-        overview: `No usable evidence was collected for ${companyA.name} versus ${companyB.name}.`,
-      },
-    };
+    if (env.tinyfishOnlyMode) {
+      onProgress('No TinyFish evidence completed in time; returning TinyFish-only timeout result');
+      rawResult = buildNoEvidenceComparisonResult({
+        companyA,
+        companyB,
+        waitMs: env.analysisPollBudgetMs,
+      });
+      fallbackMode = 'tinyfish_timeout';
+    } else {
+      onProgress('No evidence collected from TinyFish, using fast model fallback');
+      rawResult = await analyzeComparisonWithoutEvidence({ companyA, companyB, query });
+      fallbackMode = 'model_without_evidence';
+    }
   } else {
     onProgress(`Running sentiment analysis across ${evidence.length} evidence items`);
-    results = await analyzeComparisonSentiment({ companyA, companyB, evidence });
+    rawResult = await analyzeComparisonSentiment({ companyA, companyB, evidence });
   }
+  const results = formatComparisonResultForFrontend({ companyA, companyB, rawResult });
   const comments = buildCommentItems(evidence);
   const successCount = sourceResults.filter((item) => item.status === 'success').length;
   const timeoutCount = sourceResults.filter((item) => item.status === 'timeout').length;
@@ -151,7 +293,10 @@ export async function analyzeComparison(payload) {
     query,
     companyA,
     companyB,
+    leftOption: payload.leftOption || companyA,
+    rightOption: payload.rightOption || companyB,
     results,
+    rawResult,
     comments,
     evidence,
     sourceResults,
@@ -161,6 +306,13 @@ export async function analyzeComparison(payload) {
       generatedAt: new Date().toISOString(),
       commentCount: comments.length,
       sourceCount: sourceResults.length,
+      analysisPollBudgetMs: env.analysisPollBudgetMs,
+      analysisPollIntervalMs: env.analysisPollIntervalMs,
+      analysisSourceTimeoutMs: env.analysisSourceTimeoutMs,
+      analysisMaxSources: env.analysisMaxSources,
+      analysisMaxSocialSources: env.analysisMaxSocialSources,
+      tinyfishOnlyMode: env.tinyfishOnlyMode,
+      fallbackMode,
       successfulSources: successCount,
       timedOutSources: timeoutCount,
       failedSources: failureCount,

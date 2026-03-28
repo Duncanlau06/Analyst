@@ -1,6 +1,82 @@
 
 import React, { useState } from 'react';
 
+const fallbackColors = ['#00d4ff', '#ff3366', '#00ff88', '#f59e0b', '#6366f1', '#ef4444'];
+
+function slugify(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'option';
+}
+
+function cleanOptionLabel(value) {
+  return value
+    .replace(/^(which|what|who)\s+(is|are)\s+(better|best)\s+(for|between)\s+/i, '')
+    .replace(/^(which|what|who)\s+(is|are)\s+(better|best)\s+/i, '')
+    .replace(/^for\s+[^:]+:\s*/i, '')
+    .replace(/^between\s+/i, '')
+    .replace(/^(compare|comparing)\s+/i, '')
+    .replace(/^choose\s+/i, '')
+    .replace(/^decide\s+between\s+/i, '')
+    .replace(/^looking\s+at\s+/i, '')
+    .replace(/^i(?:'d| would)?\s+pick\s+/i, '')
+    .replace(/^should\s+i\s+(?:choose|pick|get)\s+/i, '')
+    .replace(/^help\s+me\s+(?:choose|pick|compare)\s+/i, '')
+    .replace(/^(an?|the)\s+/i, '')
+    .replace(/\?+$/g, '')
+    .replace(/^[\s:;,-]+|[\s:;,-]+$/g, '')
+    .trim();
+}
+
+function parseOptionsFromQuery(query) {
+  const normalizedQuery = query.trim();
+
+  const candidatePatterns = [
+    /(?:^|:)\s*(.+?)\s+(?:vs\.?|versus)\s+(.+)$/i,
+    /(?:^|:)\s*(.+?)\s+or\s+(.+)$/i,
+    /between\s+(.+?)\s+and\s+(.+)$/i,
+    /compare\s+(.+?)\s+(?:vs\.?|versus|and)\s+(.+)$/i,
+    /(?:choose|pick|get)\s+(.+?)\s+or\s+(.+)$/i,
+  ];
+
+  for (const pattern of candidatePatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (!match) {
+      continue;
+    }
+
+    const leftName = cleanOptionLabel(match[1]);
+    const rightName = cleanOptionLabel(match[2]);
+
+    if (leftName && rightName) {
+      return [leftName, rightName];
+    }
+  }
+
+  const colonIndex = normalizedQuery.lastIndexOf(':');
+  if (colonIndex !== -1) {
+    return parseOptionsFromQuery(normalizedQuery.slice(colonIndex + 1));
+  }
+
+  const sentenceFragments = normalizedQuery
+    .split(/[.?!]/)
+    .map((fragment) => fragment.trim())
+    .filter(Boolean);
+
+  for (const fragment of sentenceFragments) {
+    if (fragment !== normalizedQuery) {
+      const parsed = parseOptionsFromQuery(fragment);
+      if (parsed.length === 2) {
+        return parsed;
+      }
+    }
+  }
+
+  return [];
+}
+
 const inferOptionsFromQuery = (query) => {
   return [{ name: '' }, { name: '' }];
 };
