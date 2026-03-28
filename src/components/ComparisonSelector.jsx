@@ -82,20 +82,18 @@ const inferOptionsFromQuery = (query) => {
 };
 
 const ComparisonSelector = ({ onAdd, activeCount }) => {
-  const [query, setQuery] = useState('');
   const [leftValue, setLeftValue] = useState('');
   const [rightValue, setRightValue] = useState('');
   const [activeSearch, setActiveSearch] = useState(null); // 'left' or 'right'
 
   const isDuplicate = leftValue.trim() && rightValue.trim() && leftValue.trim().toLowerCase() === rightValue.trim().toLowerCase();
-  const canAdd = activeCount < 3 && query.trim() && query.length <= 500 && !isDuplicate;
+  const canAdd = activeCount < 3 && leftValue.trim() && rightValue.trim() && !isDuplicate;
+  
   const handleAdd = () => {
     if (!canAdd) return;
 
-    const [inferredLeft, inferredRight] = inferOptionsFromQuery(query);
-
-    const lName = leftValue.trim() || inferredLeft.name;
-    const rName = rightValue.trim() || inferredRight.name;
+    const lName = leftValue.trim();
+    const rName = rightValue.trim();
 
     const leftOption = {
       id: lName.toLowerCase().replace(/\s+/g, '-'),
@@ -109,13 +107,15 @@ const ComparisonSelector = ({ onAdd, activeCount }) => {
       color: '#ff3366'
     };
 
+    // Auto-generate query from options
+    const autoQuery = `What is better: ${lName} or ${rName}?`;
+
     onAdd({
-      query: query.trim(),
+      query: autoQuery,
       leftOption,
       rightOption
     });
 
-    setQuery('');
     setLeftValue('');
     setRightValue('');
   };
@@ -163,18 +163,6 @@ const ComparisonSelector = ({ onAdd, activeCount }) => {
     <section className="hero-panel">
       <div className="composer-card">
         <p className="eyebrow">Product Comparison Analyst</p>
-        <label className="field-label" htmlFor="comparison-query">What should we analyze?</label>
-        <textarea
-          id="comparison-query"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Example: Which is better for a student designer on a budget, MacBook Air or Surface Laptop?"
-          rows={4}
-          className="hero-input"
-        />
-        <div style={{ fontSize: '0.75rem', marginTop: '4px', color: query.length > 500 ? '#ff3366' : 'var(--text-muted)' }}>
-          {query.length}/500 characters
-        </div>
 
         <div className="selector-row">
           <div className="selector-block" style={{ position: 'relative' }}>

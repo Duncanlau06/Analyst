@@ -34,37 +34,33 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
 
           updateComparisonResult(comp.id, { status: 'complete', results });
         } else {
-          // Actual backend call
-          addTickerItem(`Live scraping via TinyFish for: ${query}`);
-          const scrapeResp = await fetch('/api/scrape', {
+          // Advanced backend call with full analysis
+          addTickerItem(`Starting analysis pipeline for: ${query}`);
+          
+          const analysisResp = await fetch('/api/comparisons/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: 'https://news.google.com', goal: `Search for ${query} and return top articles.` })
+            body: JSON.stringify({
+              query,
+              companyA: comp.companyA,
+              companyB: comp.companyB,
+              leftOption: leftOption,
+              rightOption: rightOption,
+              includeComments: true,
+              sources: ['news', 'financial', 'social']
+            })
           });
 
-          if (!scrapeResp.ok) throw new Error('Scrape failed');
-          const scrapeData = await scrapeResp.json();
-          addTickerItem(`Scraped data received. Running sentiment engine...`);
-
-          const extractedText = JSON.stringify(scrapeData.result);
-
-          // Call sentiment endpoint
-          const sentResp = await fetch('/api/sentiment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: extractedText, companyA: comp.companyA.name, companyB: comp.companyB.name })
-          });
-
-          let results;
-          if (sentResp.ok) {
-            results = await sentResp.json();
-            addTickerItem(`OpenAI sentiment scoring successful for ${query}`);
-          } else {
-            addTickerItem(`OpenAI API failed. Falling back to heuristic engine for ${query}.`);
-            results = analyzeSentimentHeuristic(extractedText, comp.companyA.name, comp.companyB.name);
+          if (!analysisResp.ok) {
+            throw new Error(`Analysis failed: ${analysisResp.statusText}`);
           }
-
-          updateComparisonResult(comp.id, { status: 'complete', results });
+          
+          const analysisData = await analysisResp.json();
+          addTickerItem(`Analysis complete for ${query}`);
+          
+          // Pass formatted results directly - backend already returns results in correct structure:
+          // { left, right, winner, comparison_summary, confidence }
+          updateComparisonResult(comp.id, { status: 'complete', results: analysisData.results });
         }
       } catch (err) {
         addTickerItem(`Error in pipeline for ${query}: ${err.message}`);
