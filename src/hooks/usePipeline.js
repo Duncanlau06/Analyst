@@ -13,67 +13,56 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
 
     for (const comp of comparisons) {
       if (comp.status === 'complete') continue;
-      
+
       const query = comp.query;
       addTickerItem(`Initiating pipeline for: ${query}`);
-      
+
       try {
         if (useMock || import.meta.env.VITE_MOCK_MODE === 'true') {
           // Simulate latency
-          addTickerItem(`Scraping EV News for ${comp.companyA.name} and ${comp.companyB.name}...`);
+          addTickerItem(`Scraping EV News for ${comp.leftOption.name} and ${comp.rightOption.name}...`);
           await new Promise(r => setTimeout(r, 1000));
           addTickerItem(`Parsing Yahoo Finance comments...`);
           await new Promise(r => setTimeout(r, 800));
           addTickerItem(getMockTickerData(query));
           await new Promise(r => setTimeout(r, 1200));
 
-          const results = generateMockResult(query, comp.companyA, comp.companyB);
+          const results = generateMockResult(query, comp.leftOption, comp.rightOption);
           addTickerItem(`Sentiment analysis complete for ${query}`);
-          
+
           updateComparisonResult(comp.id, { status: 'complete', results });
         } else {
-          addTickerItem(`Live backend analysis started for: ${query}`);
-
-          const analysisResp = await fetch('/api/comparisons/analyze', {
+          // Actual backend call
+          addTickerItem(`Live scraping via TinyFish for: ${query}`);
+          const scrapeResp = await fetch('/api/scrape', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query,
-              companyA: comp.companyA,
-              companyB: comp.companyB,
-              includeComments: true,
-              sources: ['news', 'financial', 'social']
-            })
+            body: JSON.stringify({ url: 'https://news.google.com', goal: `Search for ${query} and return top articles.` })
           });
 
-          if (!analysisResp.ok) {
-            const errorBody = await analysisResp.json().catch(() => ({}));
-            throw new Error(errorBody.error || 'Comparison analysis failed');
-          }
+          if (!scrapeResp.ok) throw new Error('Scrape failed');
+          const scrapeData = await scrapeResp.json();
+          addTickerItem(`Scraped data received. Running sentiment engine...`);
 
-          const analysis = await analysisResp.json();
-          analysis.timeline?.forEach(item => addTickerItem(item));
-          if (analysis.meta?.partial) {
-            addTickerItem(
-              `Analysis completed with partial results: ${analysis.meta?.successfulSources || 0} sources succeeded, ${analysis.meta?.timedOutSources || 0} timed out, ${analysis.meta?.failedSources || 0} failed`
-            );
+          const extractedText = JSON.stringify(scrapeData.result);
+
+          // Call sentiment endpoint
+          const sentResp = await fetch('/api/sentiment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: extractedText, companyA: comp.companyA.name, companyB: comp.companyB.name })
+          });
+
+          let results;
+          if (sentResp.ok) {
+            results = await sentResp.json();
+            addTickerItem(`OpenAI sentiment scoring successful for ${query}`);
           } else {
-            addTickerItem(`Analysis complete with ${analysis.meta?.sourcesUsed || 0} evidence items`);
+            addTickerItem(`OpenAI API failed. Falling back to heuristic engine for ${query}.`);
+            results = analyzeSentimentHeuristic(extractedText, comp.companyA.name, comp.companyB.name);
           }
-          if ((analysis.meta?.sourcesUsed || 0) === 0) {
-            addTickerItem('No usable evidence was collected. Try a broader query or run the TinyFish smoke test route.');
-          }
-          addTickerItem(`Backend runtime: ${analysis.meta?.durationMs || 0}ms`);
 
-          updateComparisonResult(comp.id, {
-            status: 'complete',
-            results: analysis.results,
-            comments: analysis.comments,
-            evidence: analysis.evidence,
-            sourceResults: analysis.sourceResults,
-            backendMeta: analysis.meta,
-            comparisonRunId: analysis.comparisonId
-          });
+          updateComparisonResult(comp.id, { status: 'complete', results });
         }
       } catch (err) {
         addTickerItem(`Error in pipeline for ${query}: ${err.message}`);

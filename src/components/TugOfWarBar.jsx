@@ -22,7 +22,7 @@ const Tooltip = ({ data, side, children }) => {
 };
 
 const statusText = {
-  idle: 'Ready',
+  idle: '',
   scanning: 'AI analysis in progress',
   complete: 'Recommendation ready',
   error: 'Analysis failed'
@@ -35,27 +35,18 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
   const winner = results?.winner || 'tie';
   const summary = results?.comparison_summary || 'Run the analysis to generate a recommendation.';
   const confidence = results?.confidence;
+  const diff = Math.abs(leftData.score - rightData.score);
+  const isClose = diff < 20;
   const barWinnerLabel =
-    winner === 'tie' ? 'Close call' : `${winner === 'left' ? leftData.name : rightData.name} leads`;
+    winner === 'tie' || (isClose && status === 'complete')
+      ? (winner === 'tie' ? 'Close call' : `${winner === 'left' ? leftData.name : rightData.name} leads`)
+      : `${winner === 'left' ? leftData.name : rightData.name} - Distant fit`;
 
   return (
     <article className={`comparison-card status-${status}`}>
       <button className="remove-button" onClick={onRemove} aria-label={`Remove ${query}`}>
         x
       </button>
-
-      <div className="comparison-head">
-        <div>
-          <p className="card-kicker">Use case</p>
-          <h3 className="comparison-query">{query}</h3>
-        </div>
-        <div className="card-status-group">
-          <span className={`winner-chip winner-${winner}`}>{barWinnerLabel}</span>
-          <span className="card-status">{statusText[status]}</span>
-        </div>
-      </div>
-
-      <p className="comparison-summary">{summary}</p>
 
       <div className="score-header">
         <div className="score-side">
@@ -94,6 +85,17 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
         </Tooltip>
       </div>
 
+      <div className="comparison-head">
+        <div>
+          <p className="card-kicker">Question:</p>
+          <h3 className="comparison-query">{query}</h3>
+        </div>
+        <div className="card-status-group">
+          <span className={`winner-chip winner-${winner} ${isClose ? 'call-close' : 'call-distant'}`}>{barWinnerLabel}</span>
+          <span className="card-status">{(status === 'complete' && isClose) ? '' : statusText[status]}</span>
+        </div>
+      </div>
+
       <div className="reasons-grid">
         <div className="reason-card">
           <p className="reason-label">Why {leftData.name}</p>
@@ -103,6 +105,11 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
           <p className="reason-label">Why {rightData.name}</p>
           <p className="reason-copy">{rightData.reason}</p>
         </div>
+      </div>
+
+      <div className="recommendation-footer">
+        <p className="reason-label">Summary Recommendation</p>
+        <p className="comparison-summary">{summary}</p>
       </div>
     </article>
   );

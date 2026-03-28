@@ -13,7 +13,6 @@ const Header = ({ isRunning, lastRun, activeCount }) => {
           <span className={`status-dot ${isRunning ? 'running' : 'ready'}`} />
           <span>{isRunning ? 'Analyzing now' : 'Ready for analysis'}</span>
         </div>
-        <div className="status-meta">{activeCount} active {activeCount === 1 ? 'comparison' : 'comparisons'}</div>
         {lastRun && (
           <div className="status-meta">
             Last run {new Date(lastRun).toLocaleTimeString()}
