@@ -15,6 +15,13 @@ function App() {
 
   const { runPipeline, isRunning } = usePipeline(updateComparisonResult, addTickerItem);
 
+  useEffect(() => {
+    const idleComparisons = comparisons.filter(c => c.status === 'idle');
+    if (idleComparisons.length > 0 && !isRunning) {
+      runPipeline(idleComparisons);
+    }
+  }, [comparisons, runPipeline, isRunning]);
+
   const handleRun = () => {
     runPipeline(comparisons);
     setLastRun(new Date());
@@ -40,7 +47,7 @@ function App() {
               opacity: isRunning ? 0.7 : 1
             }}
           >
-            {isRunning ? 'Scanning...' : 'Run Pipeline'}
+            {isRunning ? 'Scanning...' : 'Run'}
           </button>
         </div>
 

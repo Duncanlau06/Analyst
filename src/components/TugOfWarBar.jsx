@@ -1,22 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-const Tooltip = ({ data, side, children }) => {
-  const [hover, setHover] = useState(false);
-
+const Tooltip = ({ data, side, children, width }) => {
   return (
     <div
       className="bar-segment"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      style={{ width: `${width}%` }}
     >
       {children}
-      {hover && data && (
-        <div className={`bar-tooltip ${side}`}>
-          <div className="tooltip-title">{data.name}</div>
-          <div className="tooltip-score">{data.score}/100 fit score</div>
-          <div className="tooltip-reason">{data.reason}</div>
-        </div>
-      )}
     </div>
   );
 };
@@ -33,10 +23,14 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
   const leftData = results?.left || { name: leftOption.name, score: 50, reason: 'Awaiting analysis.' };
   const rightData = results?.right || { name: rightOption.name, score: 50, reason: 'Awaiting analysis.' };
   const winner = results?.winner || 'tie';
-  const summary = results?.comparison_summary || 'Run the analysis to generate a recommendation.';
+  const summary = results?.comparison_summary || 'Awaiting analysis';
   const confidence = results?.confidence;
   const diff = Math.abs(leftData.score - rightData.score);
   const isClose = diff < 20;
+
+  const totalScore = leftData.score + rightData.score;
+  const leftPercent = totalScore === 0 ? 50 : (leftData.score / totalScore) * 100;
+  const rightPercent = 100 - leftPercent;
   const barWinnerLabel =
     winner === 'tie' || (isClose && status === 'complete')
       ? (winner === 'tie' ? 'Close call' : `${winner === 'left' ? leftData.name : rightData.name} leads`)
@@ -62,22 +56,22 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
       </div>
 
       <div className="score-bar-shell">
-        <Tooltip data={leftData} side="left">
+        <Tooltip data={leftData} side="left" width={leftPercent}>
           <div
             className="score-fill left"
             style={{
-              width: `${leftData.score}%`,
-              background: 'linear-gradient(90deg, #e8870e, #f5a623)'
+              width: `100%`,
+              background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.8), #2563eb)'
             }}
           />
         </Tooltip>
-        <div className="score-divider" />
-        <Tooltip data={rightData} side="right">
+        <div className="score-divider" style={{ left: `${leftPercent}%` }} />
+        <Tooltip data={rightData} side="right" width={rightPercent}>
           <div
             className="score-fill right"
             style={{
-              width: `${rightData.score}%`,
-              background: 'linear-gradient(270deg, #f5e6a3, #fad96a)'
+              width: `100%`,
+              background: 'linear-gradient(270deg, rgba(239, 68, 68, 0.8), #dc2626)'
             }}
           />
         </Tooltip>

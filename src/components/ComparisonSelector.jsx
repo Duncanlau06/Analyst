@@ -170,7 +170,16 @@ const ComparisonSelector = ({ onAdd, activeCount }) => {
             <input
               id="left-option"
               value={leftValue}
-              onChange={(event) => setLeftValue(event.target.value)}
+              onChange={(event) => {
+                const val = event.target.value;
+                const parsed = parseOptionsFromQuery(val);
+                if (parsed.length === 2 && !rightValue) {
+                  setLeftValue(parsed[0]);
+                  setRightValue(parsed[1]);
+                } else {
+                  setLeftValue(val);
+                }
+              }}
               onFocus={() => setActiveSearch('left')}
               onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
               className="hero-input"
@@ -199,7 +208,16 @@ const ComparisonSelector = ({ onAdd, activeCount }) => {
             <input
               id="right-option"
               value={rightValue}
-              onChange={(event) => setRightValue(event.target.value)}
+              onChange={(event) => {
+                const val = event.target.value;
+                const parsed = parseOptionsFromQuery(val);
+                if (parsed.length === 2 && !leftValue) {
+                  setLeftValue(parsed[0]);
+                  setRightValue(parsed[1]);
+                } else {
+                  setRightValue(val);
+                }
+              }}
               onFocus={() => setActiveSearch('right')}
               onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
               className="hero-input"
