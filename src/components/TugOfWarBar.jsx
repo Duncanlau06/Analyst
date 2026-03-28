@@ -51,14 +51,12 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
       <div className="score-header">
         <div className="score-side">
           <span className="score-name">{leftData.name}</span>
-          <span className="score-value">{leftData.score}</span>
         </div>
         <div className="score-middle">
           <span className="score-caption">Winner bar</span>
           {typeof confidence === 'number' && <span className="confidence-copy">{Math.round(confidence * 100)}% confidence</span>}
         </div>
         <div className="score-side align-right">
-          <span className="score-value">{rightData.score}</span>
           <span className="score-name">{rightData.name}</span>
         </div>
       </div>
@@ -69,7 +67,7 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
             className="score-fill left"
             style={{
               width: `${leftData.score}%`,
-              background: `linear-gradient(90deg, ${leftOption.color}CC, ${leftOption.color})`
+              background: 'linear-gradient(90deg, #e8870e, #f5a623)'
             }}
           />
         </Tooltip>
@@ -79,7 +77,7 @@ const TugOfWarBar = ({ comparison, onRemove }) => {
             className="score-fill right"
             style={{
               width: `${rightData.score}%`,
-              background: `linear-gradient(270deg, ${rightOption.color}CC, ${rightOption.color})`
+              background: 'linear-gradient(270deg, #f5e6a3, #fad96a)'
             }}
           />
         </Tooltip>
