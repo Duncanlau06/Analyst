@@ -1,37 +1,37 @@
-import React, { useMemo, useState } from 'react';
-import { companies } from '../config/companies';
+
+import React, { useState } from 'react';
 
 const inferOptionsFromQuery = (query) => {
-  const matches = companies.filter((company) => query.toLowerCase().includes(company.name.toLowerCase()) || query.toLowerCase().includes(company.id));
-  return [matches[0] || companies[0], matches[1] || companies[1]];
+  return [{ name: '' }, { name: '' }];
 };
-
-const toOption = (company) => ({
-  id: company.id,
-  name: company.name,
-  color: company.color
-});
 
 const ComparisonSelector = ({ onAdd, activeCount }) => {
   const [query, setQuery] = useState('');
-  const [leftId, setLeftId] = useState('');
-  const [rightId, setRightId] = useState('');
+  const [leftValue, setLeftValue] = useState('');
+  const [rightValue, setRightValue] = useState('');
+  const [activeSearch, setActiveSearch] = useState(null); // 'left' or 'right'
 
-  const canAdd = activeCount < 3 && query.trim();
-  const helperText = useMemo(
-    () => 'Ask for any product or use case, then optionally pin the two options you want compared.',
-    []
-  );
-
+  const isDuplicate = leftValue.trim() && rightValue.trim() && leftValue.trim().toLowerCase() === rightValue.trim().toLowerCase();
+  const canAdd = activeCount < 3 && query.trim() && query.length <= 500 && !isDuplicate;
   const handleAdd = () => {
     if (!canAdd) return;
 
-    const selectedLeft = companies.find((company) => company.id === leftId);
-    const selectedRight = companies.find((company) => company.id === rightId);
     const [inferredLeft, inferredRight] = inferOptionsFromQuery(query);
 
-    const leftOption = toOption(selectedLeft || inferredLeft);
-    const rightOption = toOption(selectedRight || (inferredRight.id === leftOption.id ? companies.find((company) => company.id !== leftOption.id) || companies[1] : inferredRight));
+    const lName = leftValue.trim() || inferredLeft.name;
+    const rName = rightValue.trim() || inferredRight.name;
+
+    const leftOption = {
+      id: lName.toLowerCase().replace(/\s+/g, '-'),
+      name: lName,
+      color: '#00d4ff'
+    };
+
+    const rightOption = {
+      id: rName.toLowerCase().replace(/\s+/g, '-'),
+      name: rName,
+      color: '#ff3366'
+    };
 
     onAdd({
       query: query.trim(),
@@ -40,19 +40,53 @@ const ComparisonSelector = ({ onAdd, activeCount }) => {
     });
 
     setQuery('');
-    setLeftId('');
-    setRightId('');
+    setLeftValue('');
+    setRightValue('');
   };
+
+  const [leftSuggestions, setLeftSuggestions] = useState([]);
+  const [rightSuggestions, setRightSuggestions] = useState([]);
+
+  React.useEffect(() => {
+    const fetchSuggest = async (val, setter) => {
+      if (val.length < 2) {
+        setter([]);
+        return;
+      }
+      
+      try {
+        const resp = await fetch('/api/suggest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: val })
+        });
+        const web = await resp.json();
+        const suggestionsArray = Array.isArray(web) ? web : [];
+        
+        // Include user's typed value at the top if it's not already in the list
+        const typedLower = val.toLowerCase();
+        const hasTyped = suggestionsArray.some(w => w.toLowerCase() === typedLower);
+        const finalList = hasTyped ? suggestionsArray : [val, ...suggestionsArray];
+        
+        const combined = finalList.map(w => ({ name: w, type: hasTyped || w !== val ? 'Suggested' : 'Your input' }));
+        setter(combined.slice(0, 6));
+      } catch (e) {
+        setter([]);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      if (activeSearch === 'left') fetchSuggest(leftValue, setLeftSuggestions);
+      if (activeSearch === 'right') fetchSuggest(rightValue, setRightSuggestions);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [leftValue, rightValue, activeSearch]);
 
   return (
     <section className="hero-panel">
-      <div className="hero-copy">
-        <p className="eyebrow">Product Comparison Analyst</p>
-        <h1>Turn AI output into a decision bar that shows which option fits the user&apos;s need better.</h1>
-        <p className="hero-subtle">{helperText}</p>
-      </div>
-
       <div className="composer-card">
+        <p className="eyebrow">Product Comparison Analyst</p>
         <label className="field-label" htmlFor="comparison-query">What should we analyze?</label>
         <textarea
           id="comparison-query"
@@ -62,33 +96,80 @@ const ComparisonSelector = ({ onAdd, activeCount }) => {
           rows={4}
           className="hero-input"
         />
+        <div style={{ fontSize: '0.75rem', marginTop: '4px', color: query.length > 500 ? '#ff3366' : 'var(--text-muted)' }}>
+          {query.length}/500 characters
+        </div>
 
         <div className="selector-row">
-          <div className="selector-block">
+          <div className="selector-block" style={{ position: 'relative' }}>
             <label className="field-label" htmlFor="left-option">Left option</label>
-            <select id="left-option" value={leftId} onChange={(event) => setLeftId(event.target.value)} className="select-input">
-              <option value="">Auto-detect from prompt</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>{company.name}</option>
-              ))}
-            </select>
+            <input
+              id="left-option"
+              value={leftValue}
+              onChange={(event) => setLeftValue(event.target.value)}
+              onFocus={() => setActiveSearch('left')}
+              onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
+              className="hero-input"
+              style={{ minHeight: 'auto', borderRadius: '14px' }}
+              placeholder="Auto-detect or search..."
+              autoComplete="off"
+            />
+            {activeSearch === 'left' && leftSuggestions.length > 0 && (
+              <div className="suggestions-dropdown">
+                {leftSuggestions.map((s, idx) => (
+                  <div 
+                    key={idx} 
+                    className="suggestion-item"
+                    onClick={() => { setLeftValue(s.name); setActiveSearch(null); }}
+                  >
+                    <span>{s.name}</span>
+                    <span className="suggestion-meta">{s.type}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="selector-block">
+          <div className="selector-block" style={{ position: 'relative' }}>
             <label className="field-label" htmlFor="right-option">Right option</label>
-            <select id="right-option" value={rightId} onChange={(event) => setRightId(event.target.value)} className="select-input">
-              <option value="">Auto-detect from prompt</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>{company.name}</option>
-              ))}
-            </select>
+            <input
+              id="right-option"
+              value={rightValue}
+              onChange={(event) => setRightValue(event.target.value)}
+              onFocus={() => setActiveSearch('right')}
+              onBlur={() => setTimeout(() => setActiveSearch(null), 200)}
+              className="hero-input"
+              style={{ minHeight: 'auto', borderRadius: '14px' }}
+              placeholder="Auto-detect or search..."
+              autoComplete="off"
+            />
+            {activeSearch === 'right' && rightSuggestions.length > 0 && (
+              <div className="suggestions-dropdown">
+                {rightSuggestions.map((s, idx) => (
+                  <div 
+                    key={idx} 
+                    className="suggestion-item"
+                    onClick={() => { setRightValue(s.name); setActiveSearch(null); }}
+                  >
+                    <span>{s.name}</span>
+                    <span className="suggestion-meta">{s.type}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+
+        {isDuplicate && (
+          <div style={{ color: '#ff3366', fontSize: '0.85rem', marginTop: '8px' }}>
+            Left and right options cannot be the same.
+          </div>
+        )}
 
         <div className="composer-footer">
           <div className="composer-note">Outputs a winner bar, recommendation, confidence, and reasons for both sides.</div>
           <button onClick={handleAdd} disabled={!canAdd} className="primary-button">
-            Add Comparison
+            Add
           </button>
         </div>
       </div>

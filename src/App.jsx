@@ -2,17 +2,15 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import ComparisonSelector from './components/ComparisonSelector';
 import TugOfWarBar from './components/TugOfWarBar';
-import LiveTicker from './components/LiveTicker';
 import { useComparisons } from './hooks/useComparisons';
 import { usePipeline } from './hooks/usePipeline';
 
 function App() {
   const { comparisons, addComparison, removeComparison, updateComparisonResult } = useComparisons();
-  const [tickerItems, setTickerItems] = useState([]);
   const [lastRun, setLastRun] = useState(null);
 
   const addTickerItem = (msg) => {
-    setTickerItems(prev => [...prev.slice(-49), msg]); 
+    // Ticker removed, no-op
   };
 
   const { runPipeline, isRunning } = usePipeline(updateComparisonResult, addTickerItem);
@@ -24,13 +22,13 @@ function App() {
 
   return (
     <div style={{ paddingBottom: '64px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header isRunning={isRunning} lastRun={lastRun} />
+      <Header isRunning={isRunning} lastRun={lastRun} activeCount={comparisons.length} />
 
       <main style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0 20px', flex: 1 }}>
         <ComparisonSelector onAdd={addComparison} activeCount={comparisons.length} />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '18px', margin: 0 }}>Active Comparisons</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '36px' }}>
+
           
           <button
             onClick={handleRun}
@@ -46,7 +44,7 @@ function App() {
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {comparisons.length === 0 ? (
             <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
               No active comparisons. Add one above to begin.
@@ -59,7 +57,6 @@ function App() {
         </div>
       </main>
 
-      <LiveTicker items={tickerItems} />
     </div>
   );
 }
