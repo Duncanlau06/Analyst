@@ -1,86 +1,99 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { companies } from '../config/companies';
+
+const inferOptionsFromQuery = (query) => {
+  const matches = companies.filter((company) => query.toLowerCase().includes(company.name.toLowerCase()) || query.toLowerCase().includes(company.id));
+  return [matches[0] || companies[0], matches[1] || companies[1]];
+};
+
+const toOption = (company) => ({
+  id: company.id,
+  name: company.name,
+  color: company.color
+});
 
 const ComparisonSelector = ({ onAdd, activeCount }) => {
   const [query, setQuery] = useState('');
-  const [compA, setCompA] = useState('');
-  const [compB, setCompB] = useState('');
+  const [leftId, setLeftId] = useState('');
+  const [rightId, setRightId] = useState('');
+
+  const canAdd = activeCount < 3 && query.trim();
+  const helperText = useMemo(
+    () => 'Ask for any product or use case, then optionally pin the two options you want compared.',
+    []
+  );
 
   const handleAdd = () => {
-    if (activeCount >= 3) return;
-    
-    let finalQuery = query;
-    let finalA = companies.find(c => c.id === compA);
-    let finalB = companies.find(c => c.id === compB);
+    if (!canAdd) return;
 
-    if (!finalA || !finalB) {
-      // Very crude fallback if user only typed text
-      finalA = companies.find(c => query.toLowerCase().includes(c.id)) || companies[0];
-      finalB = companies.find(c => query.toLowerCase().includes(c.id) && c.id !== finalA.id) || companies[1];
-    }
-    
-    if (!finalQuery) {
-      finalQuery = `${finalA.name} vs ${finalB.name}`;
-    }
+    const selectedLeft = companies.find((company) => company.id === leftId);
+    const selectedRight = companies.find((company) => company.id === rightId);
+    const [inferredLeft, inferredRight] = inferOptionsFromQuery(query);
+
+    const leftOption = toOption(selectedLeft || inferredLeft);
+    const rightOption = toOption(selectedRight || (inferredRight.id === leftOption.id ? companies.find((company) => company.id !== leftOption.id) || companies[1] : inferredRight));
 
     onAdd({
-      query: finalQuery,
-      companyA: finalA,
-      companyB: finalB,
+      query: query.trim(),
+      leftOption,
+      rightOption
     });
-    
+
     setQuery('');
+    setLeftId('');
+    setRightId('');
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
-      <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: 'var(--text-muted)' }}>Comparison Engine (Max 3)</h3>
-      
-      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <input 
-          type="text" 
+    <section className="hero-panel">
+      <div className="hero-copy">
+        <p className="eyebrow">Product Comparison Analyst</p>
+        <h1>Turn AI output into a decision bar that shows which option fits the user&apos;s need better.</h1>
+        <p className="hero-subtle">{helperText}</p>
+      </div>
+
+      <div className="composer-card">
+        <label className="field-label" htmlFor="comparison-query">What should we analyze?</label>
+        <textarea
+          id="comparison-query"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="E.g. Tesla FSD vs NIO Battery Swap..."
-          style={{
-             flex: '1', minWidth: '250px', padding: '12px 16px', borderRadius: '8px',
-             background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-             color: 'white', fontSize: '15px'
-          }}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Example: Which is better for a student designer on a budget, MacBook Air or Surface Laptop?"
+          rows={4}
+          className="hero-input"
         />
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <select value={compA} onChange={(e) => setCompA(e.target.value)} style={selectStyle}>
-            <option value="">Company A</option>
-            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <span style={{ color: 'var(--text-muted)' }}>vs</span>
-          <select value={compB} onChange={(e) => setCompB(e.target.value)} style={selectStyle}>
-            <option value="">Company B</option>
-            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          
-          <button 
-            onClick={handleAdd}
-            disabled={activeCount >= 3}
-            style={{
-              padding: '12px 24px', borderRadius: '8px', cursor: activeCount >= 3 ? 'not-allowed' : 'pointer',
-              background: activeCount >= 3 ? '#333' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-red))',
-              color: 'white', border: 'none', fontWeight: 600, fontSize: '15px'
-            }}
-          >
-            + Add 
+        <div className="selector-row">
+          <div className="selector-block">
+            <label className="field-label" htmlFor="left-option">Left option</label>
+            <select id="left-option" value={leftId} onChange={(event) => setLeftId(event.target.value)} className="select-input">
+              <option value="">Auto-detect from prompt</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="selector-block">
+            <label className="field-label" htmlFor="right-option">Right option</label>
+            <select id="right-option" value={rightId} onChange={(event) => setRightId(event.target.value)} className="select-input">
+              <option value="">Auto-detect from prompt</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="composer-footer">
+          <div className="composer-note">Outputs a winner bar, recommendation, confidence, and reasons for both sides.</div>
+          <button onClick={handleAdd} disabled={!canAdd} className="primary-button">
+            Add Comparison
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
-};
-
-const selectStyle = {
-  padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', 
-  border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '14px',
-  appearance: 'none', cursor: 'pointer', minWidth: '130px'
 };
 
 export default ComparisonSelector;
