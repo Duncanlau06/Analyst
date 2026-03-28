@@ -27,8 +27,34 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
           addTickerItem(getMockTickerData(query));
           await new Promise(r => setTimeout(r, 1200));
 
-          const results = generateMockResult(query, comp.leftOption, comp.rightOption);
+          const rawResults = generateMockResult(query, comp.leftOption, comp.rightOption);
           addTickerItem(`Sentiment analysis complete for ${query}`);
+
+          // Transform raw results (keyed by id) into left/right format for TugOfWarBar
+          const leftRaw = rawResults[comp.leftOption.id] || {};
+          const rightRaw = rawResults[comp.rightOption.id] || {};
+          const leftScore = Math.round((leftRaw.sentiment || 0.5) * 100);
+          const rightScore = Math.round((rightRaw.sentiment || 0.5) * 100);
+
+          const results = {
+            left: {
+              name: comp.leftOption.name,
+              score: leftScore,
+              reason: leftRaw.key_reason || 'No detailed reason available.'
+            },
+            right: {
+              name: comp.rightOption.name,
+              score: rightScore,
+              reason: rightRaw.key_reason || 'No detailed reason available.'
+            },
+            winner: leftScore > rightScore ? 'left' : rightScore > leftScore ? 'right' : 'tie',
+            confidence: (leftRaw.confidence + rightRaw.confidence) / 2,
+            comparison_summary: leftScore > rightScore
+              ? `${comp.leftOption.name} edges out ${comp.rightOption.name} with a stronger overall fit for this use case.`
+              : rightScore > leftScore
+              ? `${comp.rightOption.name} edges out ${comp.leftOption.name} with a stronger overall fit for this use case.`
+              : `Both options are evenly matched for this use case.`
+          };
 
           updateComparisonResult(comp.id, { status: 'complete', results });
         } else {
