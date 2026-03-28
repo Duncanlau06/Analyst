@@ -53,13 +53,24 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
 
           const analysis = await analysisResp.json();
           analysis.timeline?.forEach(item => addTickerItem(item));
-          addTickerItem(`Analysis complete with ${analysis.meta?.sourcesUsed || 0} evidence items`);
+          if (analysis.meta?.partial) {
+            addTickerItem(
+              `Analysis completed with partial results: ${analysis.meta?.successfulSources || 0} sources succeeded, ${analysis.meta?.timedOutSources || 0} timed out, ${analysis.meta?.failedSources || 0} failed`
+            );
+          } else {
+            addTickerItem(`Analysis complete with ${analysis.meta?.sourcesUsed || 0} evidence items`);
+          }
+          if ((analysis.meta?.sourcesUsed || 0) === 0) {
+            addTickerItem('No usable evidence was collected. Try a broader query or run the TinyFish smoke test route.');
+          }
+          addTickerItem(`Backend runtime: ${analysis.meta?.durationMs || 0}ms`);
 
           updateComparisonResult(comp.id, {
             status: 'complete',
             results: analysis.results,
             comments: analysis.comments,
             evidence: analysis.evidence,
+            sourceResults: analysis.sourceResults,
             backendMeta: analysis.meta,
             comparisonRunId: analysis.comparisonId
           });

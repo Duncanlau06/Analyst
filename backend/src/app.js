@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import comparisonsRoutes from './routes/comparisons.routes.js';
 import commentsRoutes from './routes/comments.routes.js';
+import debugRoutes from './routes/debug.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import { runTinyfishAutomation } from './services/tinyfish.service.js';
 import { analyzeComparisonSentiment } from './services/sentiment.service.js';
@@ -12,6 +13,7 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 app.use('/api/health', healthRoutes);
+app.use('/api/debug', debugRoutes);
 app.use('/api/comparisons', comparisonsRoutes);
 app.use('/api/comparisons', commentsRoutes);
 
