@@ -21,14 +21,14 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
       try {
         if (useMock || import.meta.env.VITE_MOCK_MODE === 'true') {
           // Simulate latency
-          addTickerItem(`Scraping EV News for ${comp.companyA.name} and ${comp.companyB.name}...`);
+          addTickerItem(`Scraping EV News for ${comp.leftOption.name} and ${comp.rightOption.name}...`);
           await new Promise(r => setTimeout(r, 1000));
           addTickerItem(`Parsing Yahoo Finance comments...`);
           await new Promise(r => setTimeout(r, 800));
           addTickerItem(getMockTickerData(query));
           await new Promise(r => setTimeout(r, 1200));
 
-          const results = generateMockResult(query, comp.companyA, comp.companyB);
+          const results = generateMockResult(query, comp.leftOption, comp.rightOption);
           addTickerItem(`Sentiment analysis complete for ${query}`);
           
           updateComparisonResult(comp.id, { status: 'complete', results });
@@ -51,7 +51,7 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
           const sentResp = await fetch('/api/sentiment', {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ text: extractedText, companyA: comp.companyA.name, companyB: comp.companyB.name })
+             body: JSON.stringify({ text: extractedText, companyA: comp.leftOption.name, companyB: comp.rightOption.name })
           });
 
           let results;
@@ -60,7 +60,7 @@ export function usePipeline(updateComparisonResult, addTickerItem) {
             addTickerItem(`OpenAI sentiment scoring successful for ${query}`);
           } else {
             addTickerItem(`OpenAI API failed. Falling back to heuristic engine for ${query}.`);
-            results = analyzeSentimentHeuristic(extractedText, comp.companyA.name, comp.companyB.name);
+            results = analyzeSentimentHeuristic(extractedText, comp.leftOption.name, comp.rightOption.name);
           }
 
           updateComparisonResult(comp.id, { status: 'complete', results });

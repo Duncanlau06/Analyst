@@ -83,6 +83,60 @@ ${text}
   }
 });
 
+const suggestCache = new Map();
+
+// 3. AI Suggestion Endpoint
+app.post('/api/suggest', async (req, res) => {
+  const { query } = req.body;
+  
+  if (!openai || !query || query.length < 2) {
+    return res.json([]); 
+  }
+
+  const cacheKey = query.toLowerCase().trim();
+  if (suggestCache.has(cacheKey)) {
+    return res.json(suggestCache.get(cacheKey));
+  }
+
+  const prompt = `The user is typing a product name. 
+Partial query: "${query}"
+Return a JSON object with a key "suggestions" containing a list of 5 real-world brands or models related to this query.
+Example for "Nik": {"suggestions": ["Nikon", "Nikon Z9", "Nikon D850", "Canon", "Sony"]}
+Return ONLY the JSON. No markdown. No chatter.`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" }
+    });
+
+    const parsed = JSON.parse(completion.choices[0].message.content);
+    let suggestions = [];
+    
+    if (Array.isArray(parsed.suggestions)) {
+      suggestions = parsed.suggestions;
+    } else if (Array.isArray(parsed)) {
+      suggestions = parsed;
+    } else {
+      const possibleArray = Object.values(parsed).find(v => Array.isArray(v));
+      suggestions = possibleArray || [];
+    }
+
+    const filtered = suggestions.filter(s => typeof s === 'string');
+    
+    // Cache the result
+    suggestCache.set(cacheKey, filtered);
+    // Optional: limit cache size
+    if (suggestCache.size > 200) suggestCache.delete(suggestCache.keys().next().value);
+
+    res.json(filtered);
+  } catch (err) {
+    console.error('Suggest error:', err);
+    res.json([]);
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Backend proxy running on http://localhost:${PORT}`);
