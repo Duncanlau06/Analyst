@@ -7,6 +7,7 @@ export const env = {
   port: Number(process.env.PORT || 3001),
   tinyfishApiKey: process.env.TINYFISH_API_KEY || '',
   tinyfishBaseUrl: process.env.TINYFISH_BASE_URL || 'https://agent.tinyfish.ai/v1',
+  tinyfishTimeoutMs: Number(process.env.TINYFISH_TIMEOUT_MS || 45000),
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   cacheTtlMs: Number(process.env.CACHE_TTL_MS || 1000 * 60 * 10),

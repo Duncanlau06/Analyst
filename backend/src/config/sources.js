@@ -3,28 +3,31 @@ export const sourceCatalog = {
     {
       id: 'google-news',
       label: 'Google News',
-      url: 'https://news.google.com',
+      url: 'https://news.google.com/search?q=',
       weight: 1.2,
-      goal: (query, companyA, companyB) =>
-        `Search for "${query}" comparing ${companyA} and ${companyB}. Return the top 8 results with title, source, publish date, url, and a 1-2 sentence summary.`,
+      buildUrl: (query) => `https://news.google.com/search?q=${encodeURIComponent(query)}`,
+      goal: (query) =>
+        `Open the page and extract up to 5 visible search results for "${query}". For each result, return title, source name if visible, url, and a short snippet. Respond with concise JSON.`,
     },
     {
-      id: 'ev-news',
-      label: 'EV News',
-      url: 'https://electrek.co',
+      id: 'reuters-search',
+      label: 'Reuters',
+      url: 'https://www.reuters.com/site-search/',
       weight: 1.4,
-      goal: (query, companyA, companyB) =>
-        `Find the latest coverage related to "${query}" and compare how ${companyA} and ${companyB} are described. Return headline, url, date, and concise summary for up to 6 articles.`,
+      buildUrl: (query) => `https://www.reuters.com/site-search/?query=${encodeURIComponent(query)}`,
+      goal: (query) =>
+        `Open the search results page and extract up to 5 visible results for "${query}". Return title, url, and a short snippet in concise JSON.`,
     },
   ],
   financial: [
     {
-      id: 'yahoo-finance',
-      label: 'Yahoo Finance',
-      url: 'https://finance.yahoo.com',
+      id: 'marketwatch-search',
+      label: 'MarketWatch',
+      url: 'https://www.marketwatch.com/search',
       weight: 1.1,
-      goal: (query, companyA, companyB) =>
-        `Search for "${query}" and gather recent market commentary on ${companyA} and ${companyB}. Return up to 10 recent observations, article notes, or public comments with source labels and timestamps when visible.`,
+      buildUrl: (query) => `https://www.marketwatch.com/search?q=${encodeURIComponent(query)}`,
+      goal: (query) =>
+        `Open the search results page and extract up to 5 visible results for "${query}". Return title, url, and a one-sentence snippet in concise JSON.`,
     },
   ],
   social: [
@@ -34,26 +37,19 @@ export const sourceCatalog = {
       platform: 'reddit',
       url: 'https://www.reddit.com/search/?q=',
       weight: 1,
-      goal: (query, companyA, companyB) =>
-        `Search Reddit for "${query}" plus ${companyA} and ${companyB}. Return up to 12 recent comments or post excerpts with author, subreddit, url, timestamp if visible, and exact text.`,
+      buildUrl: (query) => `https://www.reddit.com/search/?q=${encodeURIComponent(query)}`,
+      goal: (query) =>
+        `Open the search page and extract up to 5 visible Reddit posts or comments for "${query}". Return author if visible, subreddit if visible, url, and short text in concise JSON.`,
     },
     {
-      id: 'youtube',
-      label: 'YouTube',
-      platform: 'youtube',
-      url: 'https://www.youtube.com/results?search_query=',
-      weight: 0.9,
-      goal: (query, companyA, companyB) =>
-        `Search YouTube for "${query}" comparing ${companyA} and ${companyB}. Return up to 8 recent video comments or discussion snippets with author, video title, url, timestamp if visible, and text.`,
-    },
-    {
-      id: 'x',
-      label: 'X',
-      platform: 'x',
-      url: 'https://x.com/search?q=',
+      id: 'hacker-news',
+      label: 'Hacker News',
+      platform: 'hn',
+      url: 'https://hn.algolia.com/',
       weight: 0.8,
-      goal: (query, companyA, companyB) =>
-        `Search public X posts for "${query}" related to ${companyA} and ${companyB}. Return up to 10 public posts with author, url, timestamp if visible, and exact text. If access is blocked, return an empty list instead of guessing.`,
+      buildUrl: (query) => `https://hn.algolia.com/?q=${encodeURIComponent(query)}`,
+      goal: (query) =>
+        `Open the search page and extract up to 5 visible discussion results for "${query}". Return title, url, points or author if visible, and a short snippet in concise JSON.`,
     },
   ],
 };
@@ -61,3 +57,11 @@ export const sourceCatalog = {
 export function getSourcesByType(types = []) {
   return types.flatMap((type) => sourceCatalog[type] || []);
 }
+
+export const smokeTestSource = {
+  id: 'tinyfish-smoke-test',
+  label: 'TinyFish Smoke Test',
+  url: 'https://scrapeme.live/shop',
+  goal:
+    'Extract the first 3 product names and prices visible on the page. Return concise JSON with a products array.',
+};

@@ -19,5 +19,6 @@ export const getCommentsController = asyncHandler(async (req, res) => {
     comparisonId,
     comments: response.comments,
     latestCommentRefreshAt: response.latestCommentRefreshAt,
+    sourceResults: response.commentSourceResults || [],
   });
 });
